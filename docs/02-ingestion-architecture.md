@@ -54,7 +54,8 @@ Rules that keep adapters cheap to write and review:
 |---|---|---|---|
 | `wordpress_gecko` | WordPress + gecko-theme + Agile tickets | Hollywood Theatre | WP REST API (`/wp-json/wp/v2/event`, `show`), Yoast og:image posters |
 | `veezi_web` | Veezi Web ticketing sites | Cinemagic | `/now-showing/`, `/movie/{slug}/` HTML; optional official API w/ theater-issued token |
-| (future) `agile_feed` | Agile Ticketing WebSales feed | fallback for Agile theaters | documented JSON feed |
+| (future) `events_calendar` | WordPress "The Events Calendar" plugin | Clinton Street, PAM/Whitsell | `/wp-json/tribe/events/v1/events` (proven by `dlowe/flicks` on these theaters) |
+| (future) `agile_feed` | Agile Ticketing WebSales feed | fallback for Agile theaters | officially documented JSON/XML feed (`feed.ashx?guid=…&showslist=true`) with titles, descriptions, poster images, and showtimes array |
 | (future) `filmbot`, `eventive`, `prekindle` | other common indie platforms | as onboarded | authored via the `add-theater` skill |
 | (escape hatch) `generic_html` | one-off custom sites | rare | per-site selectors in `adapter_config` |
 

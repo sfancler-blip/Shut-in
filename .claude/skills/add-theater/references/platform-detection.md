@@ -29,7 +29,9 @@ tells. A confident match usually turns onboarding into configuration.
   `event`, `show`, `screening`, `film` — a cinema-agency theme usually models showtimes
   as one of these (tier 0: the REST API beats HTML parsing)
 - The Events Calendar plugin (`/wp-json/tribe/events/v1/events`) sometimes holds
-  screenings — but verify it isn't just meetings/private events
+  screenings — proven route on Clinton Street and PAM/Whitsell (per `dlowe/flicks`),
+  but verify it isn't just meetings/private events (on Hollywood Theatre it holds only
+  member meetings)
 - Known agency themes: `gecko-theme` (Gecko Designs — Hollywood Theatre and other indie
   cinemas). Theme name is visible in asset URLs (`/wp-content/themes/<name>/`)
 - Cloudflare in front of WordPress is common: plain curl 403 + browser 200 ⇒ passive TLS

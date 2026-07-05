@@ -4,10 +4,13 @@ Research question: for a self-hosted, daily-cron scraping pipeline on a small VP
 (1–2 GB RAM), scaling from 2 indie theaters to ~50+ — Firecrawl vs Playwright vs
 TLS-impersonating HTTP clients vs hybrids?
 
-Researched 2026-07-05 via parallel web research with source corroboration. The planning
-sandbox could not fetch pages directly, so all claims below come from search-index data,
+Researched 2026-07-05 via two parallel tracks: a search-corroboration sweep and a
+deep-research harness with 3-vote adversarial verification per claim. The planning
+sandbox could not fetch pages directly, so most claims come from search-index data,
 project docs/issue trackers, and multiple independent write-ups; genuinely single-source
-claims are flagged inline. Verify live pricing/versions when Phase 1 starts.
+claims are flagged inline, and claims that passed adversarial verification (3-0 votes
+against dedicated refuters) are marked **[verified]**. Verify live pricing/versions when
+Phase 1 starts.
 
 ## Verdict
 
@@ -37,6 +40,19 @@ Tier 0 deserves emphasis: for **Veezi theaters, ask the theater for an API token
 (`api.us.veezi.com` returns clean JSON for films + sessions). Small nonprofits often
 cooperate, and an official feed beats any scraper.
 
+Two tier-0 routes passed adversarial verification against primary sources **[verified]**:
+
+- **Agile Ticketing's WebSales Event Feed** is officially documented for third-party
+  developers: a plain HTTPS GET to `feed.ashx?guid=<guid>&showslist=true&format=json`
+  (GUID comes from the venue's Entry Point config, visible in its ticket URLs), returning
+  JSON/XML with name, duration, descriptions, thumbnail + poster images, info link, and a
+  showtimes array — the pipeline's entire target schema, deterministically, no browser
+  and no LLM. (Whether Hollywood Theatre's specific GUID is enabled remains to be probed
+  live.)
+- **WordPress "The Events Calendar"** (`/wp-json/tribe/events/v1/events`) is a proven
+  adapter route: `dlowe/flicks` scrapes Clinton Street and PAM/Whitsell through it —
+  giving us a third ready-made platform adapter for Portland expansion.
+
 ## Decision matrix
 
 | | Cost | Cloudflare capability | Fits 1–2 GB VPS | Maintenance per new site | Daily-cron reliability | Long-term viability |
@@ -57,6 +73,11 @@ Industry experience is consistent: for **stable, templated pages scraped daily**
 per-page LLM extraction (Firecrawl's JSON mode, or raw LLM calls at $0.001–$0.01/page)
 adds cost and nondeterminism for nothing — one measured comparison found >100k tokens per
 page for extract-every-page vs <10k tokens once per site to generate parser code.
+
+Confirmed from Firecrawl's own docs **[verified]**: JSON-mode structured extraction is a
+fixed 5 credits/page (1 base + 4 for the LLM step), and their guidance for known-URL
+pages is `/scrape` JSON mode as the cheapest of their extraction endpoints — i.e., even
+the cheapest Firecrawl path meters an LLM call on every daily fetch of every page.
 
 Our policy:
 - **LLM at adapter-authoring time** (which is exactly what the `add-theater` skill is —
@@ -106,7 +127,7 @@ Python choice only meets the website at the database.
 
 | Project | City | Design |
 |---|---|---|
-| `dlowe/flicks` (active, 2026) | Portland | Python, curl_cffi, WP REST + per-site adapters — includes hollywoodtheatre.org |
+| `dlowe/flicks` (active, 2026) | Portland | Python, curl_cffi, platform adapters keyed to common backends **[verified]**: Hollywood via WP custom `event` post type, Clinton Street + PAM/Whitsell via The Events Calendar REST endpoint |
 | `BryantD/film-calendar` | Seattle | Python, per-theater scraper classes behind a common interface, TOML config, iCal/RSS out |
 | `Joeboy/cinescrapers` | London | Python, one scraper module per cinema, SQLite, powers filmhose.uk |
 
