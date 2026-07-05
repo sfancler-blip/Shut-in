@@ -64,14 +64,19 @@ Site protection varies wildly (Cinemagic: plain HTML; Hollywood: Cloudflare TLS
 fingerprinting), so fetching is a per-theater **escalation ladder** — every theater is
 served by the *cheapest tier that works*, recorded in its `adapter_config`:
 
-1. **Tier 1 — impersonating HTTP client** (default): plain HTTP with browser TLS/JA3
-   impersonation. Handles both initial targets, including Cloudflare-fronted WordPress.
-   Milliseconds and ~0 RAM per fetch.
-2. **Tier 2 — headless browser**: real Chromium via Playwright for JS-rendered sites or
-   JS-based challenges. Hundreds of MB RAM, seconds per page — acceptable because it runs
-   for *specific theaters, once a day*, not as the default path.
-3. **Tier 3 — paid scraping API**: only if some future site defeats tiers 1–2, and only
-   with written cost justification per the free-first rule (N3).
+0. **Tier 0 — structured endpoints** (probe first): platform APIs and feeds — Veezi's
+   official API (theater-issued token), WordPress REST API, JSON-LD, iCal/RSS, Agile's
+   WebSales JSON feed. Both initial targets have one.
+1. **Tier 1 — impersonating HTTP client** (default): `curl_cffi` with Chrome TLS/JA3
+   impersonation + selectolax/BeautifulSoup parsing. Handles both initial targets,
+   including Cloudflare-fronted WordPress. Milliseconds and ~0 RAM per fetch.
+2. **Tier 2 — headless browser**: stealth-patched Chromium (Patchright,
+   Playwright-compatible) for JS-rendered sites or JS challenges, launched as a fresh
+   process per run with hard timeouts. ~0.5–1 GB peak — acceptable because it runs for
+   *specific theaters, once a day*, never as the default path.
+3. **Tier 3 — paid scraping API** (ZenRows/Scrapfly-class, per problem site): only if
+   some future site defeats tiers 0–2, and only with written cost justification per the
+   free-first rule (N3).
 
 Tool selection, benchmarks, and the Python-vs-TypeScript decision: see
 `03-tooling-research.md`.

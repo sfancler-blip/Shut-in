@@ -1,0 +1,24 @@
+{
+  "skill_name": "debug-theater-scraper",
+  "note": "Prompts drafted at skill-authoring time (Phase 0). Running these requires the Phase 1 pipeline (ledger, fixtures, alerting) to exist, so the skill-creator eval loop is deferred; ideally run against deliberately induced failures during Phase 1 exit-criteria testing. Assertions to be drafted when first run.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "The Hollywood Theatre listings on the site haven't changed since Tuesday and I just got a scraper alert email. What's going on?",
+      "expected_output": "Reads the scrape_run ledger and GitHub issue before touching code, reproduces the fetch at the adapter's tier, classifies the failure correctly (e.g. Cloudflare challenge vs redesign vs parser drift), fixes by class, proves the fix with fixture tests plus a real single-theater refresh, and confirms the issue auto-closes.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Got a zero-showtimes alert for Cinemagic but the run says it succeeded",
+      "expected_output": "Recognizes the silent-redesign signature (successful fetch, parser matching nothing), diffs live response against checked-in fixtures, re-records fixtures and updates the parser/tests, and considers whether the theater is legitimately dark before assuming a bug.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "half the posters on the cinemagic page are for completely different movies",
+      "expected_output": "Routes to the enrichment branch, not the scraper: checks TMDB match confidence for the affected films, hand-fixes wrong tmdb_id matches or flips the theater's tmdb_enrichment toggle, and verifies scraped fallback data displays correctly.",
+      "files": []
+    }
+  ]
+}

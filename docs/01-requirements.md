@@ -22,7 +22,7 @@ theater's own website and refreshed **daily**.
 | Alerting on scraper failure | **Both** email and an auto-filed GitHub issue |
 | Data window | Scrape **everything the theater has published** (often 2–6 weeks out) |
 | History | **Keep past showtimes forever** (storage cost is negligible; enables "what played last month" features) |
-| Stack language | No user preference — chosen by tooling research (see `03-tooling-research.md`) |
+| Stack language | **Python** for the ingestion pipeline (no user preference; decided by tooling research — see `03-tooling-research.md`) |
 | Storage | Decided in planning (see `02-ingestion-architecture.md` § Storage) |
 
 ## Scale posture: stable contracts, simple infrastructure

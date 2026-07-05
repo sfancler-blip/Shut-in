@@ -1,0 +1,24 @@
+{
+  "skill_name": "add-theater",
+  "note": "Prompts drafted at skill-authoring time (Phase 0). Running these requires live network access to theater sites and the Phase 1 pipeline scaffolding, so the skill-creator eval loop is deferred to Phase 1 step 7 (onboard a third Portland theater using this skill and iterate on real feedback). Assertions to be drafted when first run.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add the Laurelhurst Theater to the aggregator — their site is https://www.laurelhursttheater.com/",
+      "expected_output": "Full onboarding: identifies the real showtimes source and platform, probes fetch tiers 0-1 before anything heavier, records fixtures, produces a config-driven adapter (or config row if platform is known), passing parse tests, an eyeballable screening table, TMDB match report, and a registered theater row with a green scrape_run and verified alert wiring.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "can we get cinema 21 in here? cinema21.com i think",
+      "expected_output": "Same onboarding flow despite the casual phrasing; verifies the actual domain, follows Buy-tickets links to the ticketing platform rather than scraping the marketing homepage, checks robots.txt, and completes the definition-of-done checklist.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I want to start expanding beyond Portland. Add the Grand Illusion Cinema in Seattle.",
+      "expected_output": "Creates the new seattle-wa region row first (schema already supports multi-city), sets the theater's own timezone, then runs standard onboarding. No Portland assumptions surface anywhere.",
+      "files": []
+    }
+  ]
+}
