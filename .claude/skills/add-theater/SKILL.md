@@ -67,6 +67,15 @@ Try tiers in order; record the winning tier and evidence in `adapter_config`:
 Politeness while probing: ≥1s between requests to the same host, and keep total probe
 volume to a handful of requests — this is someone's small nonprofit web server.
 
+**Stuck on a hard site?** When tiers 0–1 fail and the extraction path is unclear, a
+self-healing browser harness (e.g. `browser-use/browser-harness`) is a good *exploration*
+aid: let it self-heal its way to the showtimes on the live site, watch how it does it,
+then **codify that path into a deterministic adapter** (or a fixed Patchright tier-2
+script). This is an authoring-time aid only — what you commit is the deterministic
+adapter, never the harness. It must not end up in the daily cron (browser-heavy,
+nondeterministic — violates N2/N4). See `docs/02-ingestion-architecture.md` §
+"Authoring-time aid for hard sites".
+
 ## Step 4 — Capture fixtures
 
 Record the real responses (HTML/JSON) for every URL the adapter will touch into

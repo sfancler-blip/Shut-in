@@ -82,6 +82,21 @@ served by the *cheapest tier that works*, recorded in its `adapter_config`:
 Tool selection, benchmarks, and the Python-vs-TypeScript decision: see
 `03-tooling-research.md`.
 
+### Authoring-time aid for hard sites (not a runtime tier)
+
+When a theater defeats tiers 0–1 and the extraction path is genuinely unclear, a
+**self-healing browser harness** (e.g. [browser-use/browser-harness](https://github.com/browser-use/browser-harness)
+— a thin CDP-direct harness whose agent writes missing capabilities at runtime) is a
+useful *exploration* tool: point it at the stubborn site, let it self-heal its way to the
+showtimes, observe how it got there, then **codify that path into a deterministic
+adapter** (or a fixed Patchright tier-2 script if a browser is truly required).
+
+This is strictly an **adapter-authoring-time** aid, consistent with the pipeline's core
+policy of *LLM at authoring time, deterministic code at runtime* (`03-tooling-research.md`).
+It must **never run in the daily cron** — it is browser-heavy and nondeterministic, which
+violates the resilience and small-footprint requirements (N2, N4). What ships to
+production is the deterministic adapter it helped you discover, not the harness itself.
+
 ## Scheduling & execution model
 
 - **One process, sequential theaters** (deliberately boring): a `refresh` command iterates
