@@ -30,6 +30,7 @@ both email and an auto-filed GitHub issue.
 | [docs/04-data-model.md](docs/04-data-model.md) | Schema: regions, theaters, films, screenings, scrape ledger |
 | [docs/05-roadmap.md](docs/05-roadmap.md) | Phases: ingestion MVP → website → accounts → design → multi-city |
 | [docs/06-site-recon.md](docs/06-site-recon.md) | Recon of hollywoodtheatre.org and thecinemagictheater.com |
+| [docs/07-design-workflow.md](docs/07-design-workflow.md) | Design preview/feedback loop and design-quality tooling for Phases 2 & 4 |
 
 ## Skills (Claude Code)
 
