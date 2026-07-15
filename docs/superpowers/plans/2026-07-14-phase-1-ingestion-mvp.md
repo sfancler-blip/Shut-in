@@ -561,6 +561,8 @@ def test_4xx_raises_immediately(monkeypatch):
         return FakeResp(403)
 
     monkeypatch.setattr(fetch.requests, "get", fake_get)
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    fetch._last_hit.clear()  # isolate from prior tests' per-host state
     with pytest.raises(RuntimeError):
         fetch.get("https://example.com/a")
     assert len(calls) == 1
@@ -612,7 +614,8 @@ def get(url, *, params=None, min_gap=1.0, attempts=3, **kw):
                 r.raise_for_status()  # 4xx raises here, no retry
                 return r
             last_err = RuntimeError(f"HTTP {r.status_code} from {url}")
-        time.sleep(2**attempt)
+        if attempt < attempts - 1:  # no dead sleep before the terminal raise
+            time.sleep(2**attempt)
     raise last_err
 ```
 
