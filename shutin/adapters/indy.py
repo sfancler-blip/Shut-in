@@ -15,18 +15,43 @@ from selectolax.parser import HTMLParser
 from shutin import fetch as http
 from shutin.adapters.base import RawScreening
 
-SLUG_RE = re.compile(r'href="[^"]*/movie/([^/"]+)/?"')
+SLUG_RE = re.compile(r'/movie/([^/"?#]+)/?$')
 SHOWTIME_TEXT_RE = re.compile(r"^([A-Z][a-z]+ \d{1,2}), (\d{1,2}:\d{2}) ([ap])m$", re.IGNORECASE)
+NOW_SHOWING_HEADING = "Now Showing"
 
 
 def fetch(config: dict) -> dict:
     base = config["base_url"].rstrip("/")
     now_showing = http.get(f"{base}/now-showing/").text
     movies = {}
-    for slug in dict.fromkeys(SLUG_RE.findall(now_showing)):
+    for slug in _now_showing_slugs(now_showing):
         movies[slug] = http.get(f"{base}/movie/{slug}/").text
     return {"now_showing": now_showing, "movies": movies,
             "fetched_on": date.today().isoformat()}
+
+
+def _now_showing_slugs(now_showing_html: str) -> list[str]:
+    """Movie slugs from the "Now Showing" section only.
+
+    The hidden div also lists a much longer "Coming Soon" section with the same
+    /movie/{slug}/ link shape for films that aren't bookable yet - unscoped matching
+    turned every fetch() call into ~24 movie-page GETs (~25s at the >=1s/host politeness
+    floor) instead of ~3. Scope to the <p> that immediately follows the "Now Showing" <h2>.
+    """
+    tree = HTMLParser(now_showing_html)
+    for h2 in tree.css("h2"):
+        if h2.text(strip=True) != NOW_SHOWING_HEADING:
+            continue
+        section = h2.next
+        if section is None:
+            break
+        slugs = []
+        for a in section.css('a[href*="/movie/"]'):
+            m = SLUG_RE.search(a.attributes.get("href") or "")
+            if m:
+                slugs.append(m.group(1))
+        return list(dict.fromkeys(slugs))
+    return []
 
 
 def resolve_year(text: str, fetched_on: str) -> datetime | None:
@@ -41,7 +66,12 @@ def resolve_year(text: str, fetched_on: str) -> datetime | None:
     hour = hour % 12 + (12 if ap.lower() == "p" else 0)
     dt = datetime.strptime(f"{md} {ref.year}", "%B %d %Y").replace(hour=hour, minute=minute)
     if dt.date() < ref - timedelta(days=30):
-        dt = dt.replace(year=ref.year + 1)
+        try:
+            dt = dt.replace(year=ref.year + 1)
+        except ValueError:
+            # ponytail: Feb 29 rolling into a non-leap year - shift to Mar 1 rather than
+            # pulling in a calendar library for a once-every-few-years edge case.
+            dt = dt.replace(month=3, day=1, year=ref.year + 1)
     return dt
 
 
