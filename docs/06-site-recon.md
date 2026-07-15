@@ -152,6 +152,11 @@ selectors, treat JSON-LD as a bonus.
     genre, duration, cast/director, poster — but showtimes/session IDs must come from
     the separate plain-anchor scan described above.** Neither structured-data source
     substitutes for it.
+- **Task 6 implemented (2026-07-14):** adapter is `shutin/adapters/indy.py`, named
+  `indy` (not `veezi_web`) — parses JSON-LD `Movie` blocks for metadata and the
+  `/checkout/showing/{slug}/{sessionId}` anchors for sessions, per the strategy above.
+  Fixture tests (`tests/test_indy.py`) confirm the expected 11 screenings (Obsession 7,
+  Hour of the Wolf 1, The Furious 3).
 
 ---
 

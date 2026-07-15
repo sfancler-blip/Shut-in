@@ -53,7 +53,8 @@ Rules that keep adapters cheap to write and review:
 | Adapter | Platform | Initial theaters | Path (from recon) |
 |---|---|---|---|
 | `wordpress_gecko` | WordPress + gecko-theme + Agile tickets | Hollywood Theatre | WP REST API (`/wp-json/wp/v2/event`, `show`), Yoast og:image posters |
-| `veezi_web` | Veezi Web ticketing sites | Cinemagic | `/now-showing/`, `/movie/{slug}/` HTML; optional official API w/ theater-issued token |
+| `indy` | Indy platform (Quasar/Vue SPA, indy-systems.imgix.net CDN) | Cinemagic | `/now-showing/`, `/movie/{slug}/` — JSON-LD `Movie` block for metadata + `/checkout/showing/{slug}/{sessionId}` anchors for sessions |
+| (future) `veezi_web` | Veezi Web ticketing sites | none onboarded yet | `/now-showing/`, `/movie/{slug}/` HTML; optional official API w/ theater-issued token; still serves 200+ cinemas, just not Cinemagic |
 | (future) `events_calendar` | WordPress "The Events Calendar" plugin | Clinton Street, PAM/Whitsell | `/wp-json/tribe/events/v1/events` (proven by `dlowe/flicks` on these theaters) |
 | (future) `agile_feed` | Agile Ticketing WebSales feed | fallback for Agile theaters | officially documented JSON/XML feed (`feed.ashx?guid=…&showslist=true`) with titles, descriptions, poster images, and showtimes array |
 | (future) `filmbot`, `eventive`, `prekindle` | other common indie platforms | as onboarded | authored via the `add-theater` skill |
