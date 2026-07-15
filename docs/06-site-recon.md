@@ -111,26 +111,47 @@ selectors, treat JSON-LD as a bonus.
   branded **Indy**, not Veezi — the recon's Veezi inference was wrong for this site.
   **However**, extraction is still easy without a headless browser: every page ships a
   hidden (`position:absolute; z-index:-1000`) SEO/accessibility div containing real
-  content — on `/now-showing/`, plain `<h1>/<h2>/<p>/<a>` markup listing every film with
-  its next showtime and a link to `/checkout/showing/{slug}/{sessionId}`; on
-  `/movie/{slug}/`, full `schema.org/Movie` **microdata** (`itemprop="name"`,
-  `description`, `genre`, `duration`, `dateCreated`, `actor`, `director`, `producer`,
-  `thumbnailUrl`, `image`) plus every remaining showtime as `<a href="…/checkout/showing/
-  {slug}/{id}">Month D, H:MM am/pm</a>`. Verified present and consistent across all 3
+  content, in **three overlapping forms** — see the JSON-LD line below for which one
+  carries what. On `/now-showing/`, the div also has plain `<h1>/<h2>/<p>/<a>` markup
+  listing every film with its next showtime and a link to
+  `/checkout/showing/{slug}/{sessionId}`. Verified present and consistent across all 3
   sampled movies (Obsession: 7 showtimes, Hour of the Wolf: 1, The Furious: 3).
   **Note for Task 6:** the listing page alone carries one showtime per film — full
-  per-film showtime lists still require the `/movie/{slug}/` fetch, but a plain HTML
-  parse (regex or BeautifulSoup on `itemprop=`) is sufficient; no Veezi API, no
-  headless browser, no JSON-LD needed.
+  per-film showtime lists still require the `/movie/{slug}/` fetch. **Showtimes/session
+  IDs live ONLY in the plain `<a href="…/checkout/showing/{slug}/{id}">Month D, H:MM
+  am/pm</a>` links** — neither the JSON-LD `Movie` block nor the microdata carries any
+  session/showtime/offer field. No Veezi API, no headless browser needed; a plain HTML
+  fetch + regex (or BeautifulSoup) covers everything.
 - Fixtures: `tests/fixtures/cinemagic/` (`robots.txt`, `now_showing.html`, 3×
   `movie_*.html`) @ commit (this task's commit).
-- Poster source: **corrected** — image at `itemprop="image"` / `itemprop="thumbnailUrl"`
-  (both point to the same `indy-systems.imgix.net` URL in samples seen), inside the
-  hidden microdata div — not a Veezi asset path.
-- [Cinemagic] JSON-LD present: **no** (zero `<script type="application/ld+json">` blocks
-  across `now_showing.html` + all 3 movie pages). Use the `schema.org` **microdata**
-  (itemprop attributes) in the hidden div instead — same structured-data benefit, no
-  JSON-LD parsing needed, and it's what's actually there.
+- Poster source: **corrected** — same URL exposed three ways: JSON-LD `Movie.image` /
+  `Movie.thumbnailUrl`, microdata `itemprop="image"` / `itemprop="thumbnailUrl"`, both
+  pointing at `indy-systems.imgix.net` — not a Veezi asset path. The theater's own logo
+  (for the `MovieTheater` block, not per-film) is also on `indy-systems.imgix.net`.
+- [Cinemagic] JSON-LD present: ~~**no** (zero `<script type="application/ld+json">`
+  blocks found)~~ **CORRECTED 2026-07-14 (post-review): this was wrong.** Re-checked the
+  same checked-in fixtures with a regex that tolerates extra script attributes (the
+  original regex required `<script type="application/ld+json">` with nothing else
+  inside the tag, but the real tag is
+  `<script type="application/ld+json" data-test-id="schema-org-data">` — attribute
+  mismatch, not absence). **JSON-LD IS present, one or two blocks per page:**
+  - Every page (`now_showing.html` + all 3 movie pages) carries one `MovieTheater`
+    block: theater `name`/`brand`/`description`/`address`/`telephone`/`email`/`geo`/
+    `screenCount`/`logo`/`url`. No film or showtime data in this block.
+  - Every `/movie/{slug}/` page additionally carries one `Movie` block: `name`,
+    `description`, `genre`, `duration` (ISO 8601, e.g. `PT1H49M`), `dateCreated`,
+    `keywords`, `sameAs`, `actor[]`/`director[]`/`producer[]` (each `{"@type":"Person",
+    "name":…}`), `thumbnailUrl`, `image`, and a `trailer` (`VideoObject` with a YouTube
+    embed `@id` + thumbnail). **Confirmed absent from this block: showtimes, sessions,
+    offers, prices, dates — nothing time-related beyond `dateCreated` (release date).**
+  - The microdata (`itemprop=`) in the same hidden div duplicates the `Movie` JSON-LD
+    fields (same set, same values) — pick whichever's easier to parse (JSON-LD is a
+    straight `json.loads`, microdata needs attribute scraping); they are redundant, not
+    complementary.
+  - **For Task 6: use JSON-LD (or microdata) for movie metadata — title, description,
+    genre, duration, cast/director, poster — but showtimes/session IDs must come from
+    the separate plain-anchor scan described above.** Neither structured-data source
+    substitutes for it.
 
 ---
 

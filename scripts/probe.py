@@ -44,19 +44,36 @@ def probe_hollywood():
     for e in events[:5]:
         print("   ", e["title"]["rendered"])
 
-    # Claim: show post by de-suffixed slug, poster in yoast og_image
+    # Claim: show post by de-suffixed slug, poster in yoast og_image.
+    # Sample the first 3 unique show slugs unconditionally. Some shows (e.g.
+    # reissue "label presents" screenings) have no featured image at all, so
+    # to guarantee the fixture set includes a poster-bearing sample, keep
+    # scanning (bounded to 10 extra attempts) for the first additional slug
+    # whose show actually has one. Cap: 4 fixtures, <=13 show requests total.
     import re
     seen = set()
+    have_poster = False
+    extra_attempts = 0
+    max_extra_attempts = 10
     for e in events:
         slug = re.sub(r"-\d{4}-\d{2}-\d{2}.*$", "", e["slug"])
-        if slug in seen or len(seen) >= 3:
+        if slug in seen:
             continue
+        if len(seen) >= 3:
+            if have_poster or extra_attempts >= max_extra_attempts:
+                break
+            extra_attempts += 1
         seen.add(slug)
         r = get(f"{base}/wp-json/wp/v2/show", params={"slug": slug})
-        save("hollywood-theatre", f"show_{slug}.json", r.text)
         shows = r.json()
         og = (shows[0].get("yoast_head_json", {}).get("og_image") if shows else None)
         print(f"  show '{slug}': {'HIT' if shows else 'MISS'}, poster: {bool(og)}")
+        # Save unconditionally for the first 3; beyond that, only save the
+        # first poster-bearing hit (that's the 4th, deterministic, fixture).
+        if len(seen) <= 3 or og:
+            save("hollywood-theatre", f"show_{slug}.json", r.text)
+        if og:
+            have_poster = True
 
 
 def probe_cinemagic():
