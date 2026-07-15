@@ -1650,47 +1650,59 @@ def _failure_body(theater: dict, run: dict) -> str:
     )
 
 
+# AMENDED (Task 9 review): each channel wrapped in its own try/except — the global
+# constraint says alert failures must NEVER crash the scrape run, and a GitHub
+# failure must not skip the email attempt (or vice versa).
 def notify_failure(theater: dict, run: dict, cfg: dict) -> None:
-    if cfg.get("github_token") and cfg.get("github_repo"):
-        base = f"https://api.github.com/repos/{cfg['github_repo']}/issues"
-        existing = _find_open_issue(theater, cfg)
-        if existing:
-            _github_api("POST", f"{base}/{existing['number']}/comments", cfg,
-                        {"body": _failure_body(theater, run)})
+    try:
+        if cfg.get("github_token") and cfg.get("github_repo"):
+            base = f"https://api.github.com/repos/{cfg['github_repo']}/issues"
+            existing = _find_open_issue(theater, cfg)
+            if existing:
+                _github_api("POST", f"{base}/{existing['number']}/comments", cfg,
+                            {"body": _failure_body(theater, run)})
+            else:
+                _github_api("POST", base, cfg, {
+                    "title": _issue_title(theater["id"]),
+                    "labels": [LABEL],
+                    "body": _failure_body(theater, run),
+                })
         else:
-            _github_api("POST", base, cfg, {
-                "title": _issue_title(theater["id"]),
-                "labels": [LABEL],
-                "body": _failure_body(theater, run),
-            })
-    else:
-        print("alerts: github channel disabled (GITHUB_TOKEN/GITHUB_REPO unset)")
+            print("alerts: github channel disabled (GITHUB_TOKEN/GITHUB_REPO unset)")
+    except Exception as e:
+        print(f"alerts: github channel failed ({e}) - continuing")
 
-    if cfg.get("smtp") and cfg.get("alert_email"):
-        msg = EmailMessage()
-        msg["Subject"] = f"[shut-in] {theater['id']} scrape {run['outcome']}"
-        msg["From"] = cfg["smtp"]["user"] or "shutin@localhost"
-        msg["To"] = cfg["alert_email"]
-        msg.set_content(_failure_body(theater, run))
-        with smtplib.SMTP(cfg["smtp"]["host"], cfg["smtp"]["port"]) as s:
-            s.starttls()
-            if cfg["smtp"]["user"]:
-                s.login(cfg["smtp"]["user"], cfg["smtp"]["password"])
-            s.send_message(msg)
-    else:
-        print("alerts: email channel disabled (SMTP_*/ALERT_EMAIL unset)")
+    try:
+        if cfg.get("smtp") and cfg.get("alert_email"):
+            msg = EmailMessage()
+            msg["Subject"] = f"[shut-in] {theater['id']} scrape {run['outcome']}"
+            msg["From"] = cfg["smtp"]["user"] or "shutin@localhost"
+            msg["To"] = cfg["alert_email"]
+            msg.set_content(_failure_body(theater, run))
+            with smtplib.SMTP(cfg["smtp"]["host"], cfg["smtp"]["port"]) as s:
+                s.starttls()
+                if cfg["smtp"]["user"]:
+                    s.login(cfg["smtp"]["user"], cfg["smtp"]["password"])
+                s.send_message(msg)
+        else:
+            print("alerts: email channel disabled (SMTP_*/ALERT_EMAIL unset)")
+    except Exception as e:
+        print(f"alerts: email channel failed ({e}) - continuing")
 
 
 def notify_recovery(theater: dict, cfg: dict) -> None:
-    if not (cfg.get("github_token") and cfg.get("github_repo")):
-        print("alerts: github channel disabled (GITHUB_TOKEN/GITHUB_REPO unset)")
-        return
-    existing = _find_open_issue(theater, cfg)
-    if existing:
-        base = f"https://api.github.com/repos/{cfg['github_repo']}/issues/{existing['number']}"
-        _github_api("POST", f"{base}/comments", cfg,
-                    {"body": f"{theater['name']} recovered — latest run green. Auto-closing."})
-        _github_api("PATCH", base, cfg, {"state": "closed"})
+    try:
+        if not (cfg.get("github_token") and cfg.get("github_repo")):
+            print("alerts: github channel disabled (GITHUB_TOKEN/GITHUB_REPO unset)")
+            return
+        existing = _find_open_issue(theater, cfg)
+        if existing:
+            base = f"https://api.github.com/repos/{cfg['github_repo']}/issues/{existing['number']}"
+            _github_api("POST", f"{base}/comments", cfg,
+                        {"body": f"{theater['name']} recovered — latest run green. Auto-closing."})
+            _github_api("PATCH", base, cfg, {"state": "closed"})
+    except Exception as e:
+        print(f"alerts: recovery notification failed ({e}) - continuing")
 ```
 
 - [ ] **Step 4: Run tests to verify pass**
