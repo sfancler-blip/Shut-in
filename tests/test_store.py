@@ -10,7 +10,8 @@ TZ = "America/Los_Angeles"
 def setup_conn():
     conn = db.connect(":memory:")
     db.migrate(conn)
-    conn.execute("INSERT INTO region VALUES ('portland-or', 'Portland, OR', ?)", (TZ,))
+    # OR IGNORE: 002_seed_portland (Task 10) now seeds this region via migrate()
+    conn.execute("INSERT OR IGNORE INTO region VALUES ('portland-or', 'Portland, OR', ?)", (TZ,))
     conn.execute(
         "INSERT INTO theater (id, region_id, name, website_url, timezone, adapter, adapter_config)"
         " VALUES ('t1', 'portland-or', 'T1', 'http://x', ?, 'veezi_web', '{}')",
