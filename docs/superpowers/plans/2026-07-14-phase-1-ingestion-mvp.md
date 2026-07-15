@@ -33,7 +33,7 @@ shutin/                      # package
     __init__.py              # ADAPTERS registry
     base.py                  # RawScreening dataclass, Adapter protocol
     wordpress_gecko.py       # Hollywood Theatre
-    veezi_web.py             # Cinemagic
+    indy.py                  # Cinemagic (Indy platform — Task 2 corrected the recon's Veezi guess)
   normalize.py               # wall-clock→UTC, title normalization
   store.py                   # film/screening upserts, ledger
   enrich.py                  # TMDB matching
@@ -51,7 +51,7 @@ tests/
   test_db.py
   test_fetch.py
   test_wordpress_gecko.py
-  test_veezi_web.py
+  test_indy.py
   test_normalize.py
   test_store.py
   test_enrich.py
@@ -647,15 +647,15 @@ class Adapter(Protocol):
 `shutin/adapters/__init__.py`:
 
 ```python
-from shutin.adapters import veezi_web, wordpress_gecko
+from shutin.adapters import indy, wordpress_gecko
 
 ADAPTERS = {
     "wordpress_gecko": wordpress_gecko,
-    "veezi_web": veezi_web,
+    "indy": indy,
 }
 ```
 
-(Temporarily create empty `shutin/adapters/wordpress_gecko.py` and `shutin/adapters/veezi_web.py` stubs — filled by Tasks 5–6.)
+(Temporarily create empty `shutin/adapters/wordpress_gecko.py` and `shutin/adapters/indy.py` stubs — filled by Tasks 5–6.)
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -855,26 +855,31 @@ git commit -m "feat: wordpress_gecko adapter (Hollywood Theatre) with fixture te
 
 ---
 
-### Task 6: `veezi_web` adapter (Cinemagic)
+### Task 6: `indy` adapter (Cinemagic)
 
-Selectors below are recon-informed **guesses**; Task 2's `now_showing.html` / `movie_*.html` fixtures are authoritative — expect to revise selectors in Step 4. If the fixtures contain JSON-LD `ScreeningEvent`/`Movie` blocks, prefer parsing those over CSS selectors (more stable) and note it in docs/06.
+**Amended after Task 2 live verification (2026-07-14):** Cinemagic is NOT on Veezi — it runs an "Indy"-branded Quasar/Vue SPA (CDN `indy-systems.imgix.net`) whose raw HTML ships a hidden SSR div. Structured data facts (from checked-in fixtures, authoritative):
+- Every page has `<script type="application/ld+json" data-test-id="schema-org-data">` blocks: `MovieTheater` (all pages) and `Movie` (movie pages: name, description, genre, duration, cast/director/producer, poster/image, trailer `VideoObject`). **No showtimes/sessions/offers in JSON-LD.**
+- Showtimes exist ONLY as hidden-div anchors: `<a href=".../checkout/showing/{slug}/{sessionId}">Month D, H:MM am/pm</a>` — note **no year** in the text; the adapter needs a year-inference rule.
+- Microdata (`itemprop=`) duplicates the JSON-LD — redundant, ignore it.
+
+Parse strategy: JSON-LD `Movie` for film metadata + regex/selector over checkout anchors for sessions. Year inference must not make `parse` impure: `fetch` stamps `payload["fetched_on"] = date.today().isoformat()`, and `parse` resolves each Month-Day against that reference (use the reference year; if the resulting date lands more than ~30 days before `fetched_on`, roll to the next year). Fixture tests pass a fixed `fetched_on`.
 
 **Files:**
-- Create: `shutin/adapters/veezi_web.py` (replace stub), `tests/test_veezi_web.py`
+- Create: `shutin/adapters/indy.py` (replace stub), `tests/test_indy.py`
 
 **Interfaces:**
 - Consumes: `fetch.get`, fixtures `tests/fixtures/cinemagic/*`.
-- Produces: module with `fetch(config: dict) -> dict` returning `{"now_showing": <html str>, "movies": {slug: <html str>}}` and `parse(payload) -> list[RawScreening]`. `config` keys: `base_url` (e.g. `"https://tickets.thecinemagictheater.com"`).
+- Produces: module with `fetch(config: dict) -> dict` returning `{"now_showing": <html str>, "movies": {slug: <html str>}, "fetched_on": "YYYY-MM-DD"}` and `parse(payload) -> list[RawScreening]`. `config` keys: `base_url` (e.g. `"https://tickets.thecinemagictheater.com"`).
 
 - [ ] **Step 1: Write the failing fixture test**
 
-`tests/test_veezi_web.py`:
+`tests/test_indy.py`:
 
 ```python
 import pathlib
 from datetime import datetime
 
-from shutin.adapters import veezi_web as vw
+from shutin.adapters import indy
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "cinemagic"
 
@@ -884,47 +889,62 @@ def load_payload():
         f.stem.removeprefix("movie_"): f.read_text(encoding="utf-8")
         for f in FIX.glob("movie_*.html")
     }
-    return {"now_showing": (FIX / "now_showing.html").read_text(encoding="utf-8"), "movies": movies}
+    return {
+        "now_showing": (FIX / "now_showing.html").read_text(encoding="utf-8"),
+        "movies": movies,
+        "fetched_on": "2026-07-14",  # fixtures captured this day; keeps parse deterministic
+    }
 
 
 def test_parse_extracts_screenings():
-    screenings = vw.parse(load_payload())
-    assert len(screenings) > 0
+    screenings = indy.parse(load_payload())
+    # fixtures: Obsession 7 showtimes, Hour of the Wolf 1, The Furious 3
+    assert len(screenings) == 11
     s = screenings[0]
     assert s.film_title
     assert isinstance(s.starts_at_local, datetime) and s.starts_at_local.tzinfo is None
 
 
-def test_screenings_carry_film_metadata():
-    screenings = vw.parse(load_payload())
-    assert any(s.description for s in screenings)
-    assert any(s.poster_url for s in screenings)
+def test_screenings_carry_jsonld_film_metadata():
+    screenings = indy.parse(load_payload())
+    assert all(s.description for s in screenings)
+    assert all(s.poster_url for s in screenings)
+    assert any(s.runtime_minutes for s in screenings)  # JSON-LD Movie duration
 
 
-def test_ticket_urls_point_at_veezi_purchase():
-    screenings = vw.parse(load_payload())
-    urls = [s.ticket_url for s in screenings if s.ticket_url]
-    assert urls and all("veezi" in u or u.startswith("http") for u in urls)
+def test_ticket_urls_are_checkout_links():
+    screenings = indy.parse(load_payload())
+    assert all(s.ticket_url and "/checkout/showing/" in s.ticket_url for s in screenings)
+
+
+def test_year_inference_rolls_forward():
+    # "January 5" fetched on 2026-12-20 must resolve to 2027, not 2026
+    assert indy.resolve_year("January 5, 7:30 pm", "2026-12-20") == datetime(2027, 1, 5, 19, 30)
+    # same-month date stays in the fetch year
+    assert indy.resolve_year("December 21, 7:30 pm", "2026-12-20") == datetime(2026, 12, 21, 19, 30)
 ```
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `.venv/Scripts/python -m pytest tests/test_veezi_web.py -v`
+Run: `.venv/Scripts/python -m pytest tests/test_indy.py -v`
 Expected: FAIL — stub has no `parse`.
 
 - [ ] **Step 3: Implement**
 
-`shutin/adapters/veezi_web.py` (starting point — Step 4 reconciles with fixtures):
+`shutin/adapters/indy.py` (starting point — Step 4 reconciles exact regexes/anchors with fixtures):
 
 ```python
-"""Veezi Web ticketing sites (Cinemagic pattern): server-rendered HTML.
+"""Indy cinema platform (indy-systems.imgix.net CDN; Cinemagic pattern).
 
-/now-showing/ lists films; /movie/{slug}/ has description, poster, and session times
-linking to ticketing.<region>.veezi.com/purchase/{sessionId}.
+Quasar/Vue SPA whose raw HTML ships a hidden SSR div. Film metadata comes from the
+JSON-LD Movie block (<script type="application/ld+json" data-test-id="schema-org-data">);
+showtimes exist ONLY as hidden-div anchors:
+    <a href=".../checkout/showing/{slug}/{sessionId}">Month D, H:MM am/pm</a>
+JSON-LD has no sessions; anchor text has no year (see resolve_year).
 """
 import json
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from selectolax.parser import HTMLParser
 
@@ -932,6 +952,7 @@ from shutin import fetch as http
 from shutin.adapters.base import RawScreening
 
 SLUG_RE = re.compile(r'href="[^"]*/movie/([^/"]+)/?"')
+SHOWTIME_TEXT_RE = re.compile(r"^([A-Z][a-z]+ \d{1,2}), (\d{1,2}:\d{2}) ([ap])m$", re.IGNORECASE)
 
 
 def fetch(config: dict) -> dict:
@@ -940,87 +961,93 @@ def fetch(config: dict) -> dict:
     movies = {}
     for slug in dict.fromkeys(SLUG_RE.findall(now_showing)):
         movies[slug] = http.get(f"{base}/movie/{slug}/").text
-    return {"now_showing": now_showing, "movies": movies}
+    return {"now_showing": now_showing, "movies": movies,
+            "fetched_on": date.today().isoformat()}
+
+
+def resolve_year(text: str, fetched_on: str) -> datetime | None:
+    """'August 24, 8:00 pm' + fetch date -> naive datetime, rolling into next year
+    when the month/day already passed (>30 days before fetch)."""
+    m = SHOWTIME_TEXT_RE.match(text.strip())
+    if not m:
+        return None
+    ref = date.fromisoformat(fetched_on)
+    md, hm, ap = m.groups()
+    hour, minute = (int(x) for x in hm.split(":"))
+    hour = hour % 12 + (12 if ap.lower() == "p" else 0)
+    dt = datetime.strptime(f"{md} {ref.year}", "%B %d %Y").replace(hour=hour, minute=minute)
+    if dt.date() < ref - timedelta(days=30):
+        dt = dt.replace(year=ref.year + 1)
+    return dt
 
 
 def parse(payload: dict) -> list[RawScreening]:
     out = []
     for slug, html_text in payload["movies"].items():
-        out.extend(_parse_movie_page(html_text))
+        out.extend(_parse_movie_page(html_text, payload["fetched_on"]))
     return out
 
 
-def _parse_movie_page(html_text: str) -> list[RawScreening]:
+def _parse_movie_page(html_text: str, fetched_on: str) -> list[RawScreening]:
     tree = HTMLParser(html_text)
+    movie = _jsonld_movie(tree)
+    title = movie.get("name", "")
+    description = movie.get("description")
+    poster = movie.get("image") or movie.get("thumbnailUrl")
+    runtime = _iso_duration_minutes(movie.get("duration"))
 
-    # Prefer JSON-LD if the platform emits it (verify against fixture; delete this
-    # branch in Step 4 if absent).
+    out = []
+    for a in tree.css('a[href*="/checkout/showing/"]'):
+        dt = resolve_year(a.text(strip=True), fetched_on)
+        if dt:
+            out.append(RawScreening(
+                film_title=title,
+                starts_at_local=dt,
+                description=description,
+                poster_url=poster,
+                runtime_minutes=runtime,
+                ticket_url=a.attributes.get("href"),
+            ))
+    return out
+
+
+def _jsonld_movie(tree) -> dict:
     for node in tree.css('script[type="application/ld+json"]'):
         try:
             data = json.loads(node.text())
         except ValueError:
             continue
-        items = data if isinstance(data, list) else [data]
-        events = [d for d in items if d.get("@type") in ("ScreeningEvent", "Event")]
-        if events:
-            return [_from_jsonld(e) for e in events]
-
-    # HTML-selector path — placeholder selectors; Step 4 sets the real ones from fixtures.
-    title = tree.css_first("h1").text(strip=True)
-    desc_node = tree.css_first(".film-description, .synopsis, [class*=synopsis]")
-    poster_node = tree.css_first('meta[property="og:image"]')
-    out = []
-    for a in tree.css('a[href*="veezi.com/purchase"], a[href*="/purchase/"]'):
-        dt = _session_datetime(a)
-        if dt:
-            out.append(
-                RawScreening(
-                    film_title=title,
-                    starts_at_local=dt,
-                    description=desc_node.text(strip=True) if desc_node else None,
-                    poster_url=poster_node.attributes.get("content") if poster_node else None,
-                    ticket_url=a.attributes.get("href"),
-                )
-            )
-    return out
+        for item in data if isinstance(data, list) else [data]:
+            if item.get("@type") == "Movie":
+                return item
+    return {}
 
 
-def _from_jsonld(e: dict) -> RawScreening:
-    dt = datetime.fromisoformat(e["startDate"]).replace(tzinfo=None)
-    work = e.get("workPresented", {})
-    return RawScreening(
-        film_title=work.get("name") or e.get("name", ""),
-        starts_at_local=dt,
-        description=work.get("description") or e.get("description"),
-        poster_url=work.get("image") or e.get("image"),
-        ticket_url=e.get("url"),
-    )
-
-
-def _session_datetime(a_node):
-    """Derive the session datetime from the buy-link's surrounding markup.
-
-    Veezi session buttons conventionally carry the time as text ("7:30 PM") inside a
-    date-grouped container. Real attribute/structure comes from the fixture in Step 4.
-    """
-    raise NotImplementedError("set from fixture in Task 6 Step 4")
+def _iso_duration_minutes(duration: str | None) -> int | None:
+    """'PT1H38M' -> 98; None/unparseable -> None."""
+    if not duration:
+        return None
+    m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?", duration)
+    if not m or not any(m.groups()):
+        return None
+    return int(m.group(1) or 0) * 60 + int(m.group(2) or 0)
 ```
 
 - [ ] **Step 4: Reconcile with fixtures until green**
 
-Open `tests/fixtures/cinemagic/movie_*.html`, find the actual structure (JSON-LD present? session-button markup? date containers?), replace the placeholder selectors and `_session_datetime`, delete the unused branch.
+The fixtures are the truth for: exact showtime anchor text format (spacing, am/pm case, comma placement), JSON-LD structure (single object vs list, image field name), duration format. Adjust `SHOWTIME_TEXT_RE`, `_jsonld_movie`, and the expected screening count (11) to what the fixtures actually contain — if the count differs, recount from the fixtures by hand before changing the assertion.
 
-Run: `.venv/Scripts/python -m pytest tests/test_veezi_web.py -v` — iterate until 3 PASS.
+Run: `.venv/Scripts/python -m pytest tests/test_indy.py -v` — iterate until 4 PASS.
 
 - [ ] **Step 5: Record what was true**
 
-One-line update to `docs/06-site-recon.md` Cinemagic section: which path won (JSON-LD vs selectors) and the selector set used.
+One-line update to `docs/06-site-recon.md` Cinemagic section (adapter named `indy`, parse source = JSON-LD + checkout anchors), and correct the `docs/02-ingestion-architecture.md` adapter-library table row: Cinemagic's adapter is `indy`, not `veezi_web` (keep the `veezi_web` row as a future adapter — the platform still serves 200+ cinemas, just not this one).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add shutin/adapters/veezi_web.py tests/test_veezi_web.py docs/06-site-recon.md
-git commit -m "feat: veezi_web adapter (Cinemagic) with fixture tests"
+git add shutin/adapters/indy.py tests/test_indy.py docs/06-site-recon.md docs/02-ingestion-architecture.md
+git commit -m "feat: indy adapter (Cinemagic) with fixture tests"
 ```
 
 ---
@@ -1694,7 +1721,7 @@ VALUES
    'wordpress_gecko', '{"base_url": "https://hollywoodtheatre.org"}'),
   ('cinemagic', 'portland-or', 'Cinemagic',
    'https://www.thecinemagictheater.com', 'America/Los_Angeles',
-   'veezi_web', '{"base_url": "https://tickets.thecinemagictheater.com"}');
+   'indy', '{"base_url": "https://tickets.thecinemagictheater.com"}');
 ```
 
 - [ ] **Step 2: Write failing CLI tests**
