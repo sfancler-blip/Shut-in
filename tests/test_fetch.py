@@ -43,6 +43,8 @@ def test_4xx_raises_immediately(monkeypatch):
         return FakeResp(403)
 
     monkeypatch.setattr(fetch.requests, "get", fake_get)
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    fetch._last_hit.clear()
     with pytest.raises(RuntimeError):
         fetch.get("https://example.com/a")
     assert len(calls) == 1

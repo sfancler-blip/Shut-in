@@ -24,5 +24,6 @@ def get(url, *, params=None, min_gap=1.0, attempts=3, **kw):
                 r.raise_for_status()  # 4xx raises here, no retry
                 return r
             last_err = RuntimeError(f"HTTP {r.status_code} from {url}")
-        time.sleep(2**attempt)
+        if attempt < attempts - 1:
+            time.sleep(2**attempt)
     raise last_err
