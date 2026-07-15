@@ -23,22 +23,22 @@ def enrich_pending_films(conn, api_key: str) -> dict:
         try:
             r = fetch.get(SEARCH_URL, params={"api_key": api_key, "query": film["normalized_title"]})
             candidates = r.json().get("results", [])
+            best = max(candidates, key=lambda c: score(film["title"], c), default=None)
+            conf = score(film["title"], best) if best else 0.0
+            if best and conf >= MATCH_THRESHOLD:
+                conn.execute(
+                    "UPDATE film SET tmdb_id=?, tmdb_description=?, tmdb_poster_path=?,"
+                    " tmdb_match_confidence=?, enrichment_status='matched' WHERE id=?",
+                    (best["id"], best.get("overview"), best.get("poster_path"), conf, film["id"]),
+                )
+                result["matched"] += 1
+            else:
+                conn.execute(
+                    "UPDATE film SET tmdb_match_confidence=?, enrichment_status='no_match' WHERE id=?",
+                    (conf, film["id"]),
+                )
+                result["no_match"] += 1
+            conn.commit()
         except Exception:
             continue  # F4/N2: enrichment failure never blocks anything; retry next run
-        best = max(candidates, key=lambda c: score(film["title"], c), default=None)
-        conf = score(film["title"], best) if best else 0.0
-        if best and conf >= MATCH_THRESHOLD:
-            conn.execute(
-                "UPDATE film SET tmdb_id=?, tmdb_description=?, tmdb_poster_path=?,"
-                " tmdb_match_confidence=?, enrichment_status='matched' WHERE id=?",
-                (best["id"], best.get("overview"), best.get("poster_path"), conf, film["id"]),
-            )
-            result["matched"] += 1
-        else:
-            conn.execute(
-                "UPDATE film SET tmdb_match_confidence=?, enrichment_status='no_match' WHERE id=?",
-                (conf, film["id"]),
-            )
-            result["no_match"] += 1
-    conn.commit()
     return result

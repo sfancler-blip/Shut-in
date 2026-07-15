@@ -55,6 +55,43 @@ def test_matched_film_not_requeried(monkeypatch):
     assert calls == []
 
 
+def test_malformed_candidate_does_not_block_other_films(monkeypatch):
+    conn = seeded_conn()
+    conn.execute(
+        "INSERT INTO film (title, normalized_title) VALUES ('Aliens (35mm)', 'aliens')"
+    )
+
+    responses = {
+        "alien": {"results": [
+            {"id": 348, "title": "Alien", "overview": "In space...",
+             "poster_path": "/alien.jpg", "popularity": 60},
+        ]},
+        "aliens": {"results": [
+            {"title": "Aliens", "popularity": 90},  # missing "id" -> KeyError on write
+        ]},
+    }
+
+    class FakeResp:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def json(self):
+            return self._payload
+
+    def fake_get(url, *, params=None, **kw):
+        return FakeResp(responses[params["query"]])
+
+    monkeypatch.setattr(enrich.fetch, "get", fake_get)
+
+    result = enrich.enrich_pending_films(conn, api_key="x")  # must not raise
+
+    rows = {r["normalized_title"]: r for r in conn.execute("SELECT * FROM film").fetchall()}
+    assert rows["alien"]["enrichment_status"] == "matched"
+    assert rows["alien"]["tmdb_id"] == 348
+    assert rows["aliens"]["enrichment_status"] == "pending"
+    assert result["matched"] == 1
+
+
 def test_api_error_leaves_film_pending(monkeypatch):
     conn = seeded_conn()
 
