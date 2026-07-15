@@ -27,6 +27,11 @@ def finish_run(conn, run_id: int, outcome: str, counts: dict, error_detail: str 
     conn.commit()
 
 
+def mark_alerted(conn, run_id: int) -> None:
+    conn.execute("UPDATE scrape_run SET alerted=1 WHERE id=?", (run_id,))
+    conn.commit()
+
+
 def was_previously_healthy(conn, theater_id: str) -> bool:
     row = conn.execute(
         "SELECT 1 FROM scrape_run WHERE theater_id=? AND outcome='ok' AND screenings_found>0 LIMIT 1",

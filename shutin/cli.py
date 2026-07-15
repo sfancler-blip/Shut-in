@@ -22,12 +22,13 @@ def refresh(theater_id: str | None = None) -> int:
     exit_code = 0
     for t in rows:
         theater = dict(t)
-        run_id = store.start_run(conn, theater["id"])
-        prev_alerted = conn.execute(
-            "SELECT alerted FROM scrape_run WHERE theater_id=? AND id<? ORDER BY id DESC LIMIT 1",
-            (theater["id"], run_id),
-        ).fetchone()
+        run_id = None
         try:
+            run_id = store.start_run(conn, theater["id"])
+            prev_alerted = conn.execute(
+                "SELECT alerted FROM scrape_run WHERE theater_id=? AND id<? ORDER BY id DESC LIMIT 1",
+                (theater["id"], run_id),
+            ).fetchone()
             adapter = ADAPTERS[theater["adapter"]]
             raw = adapter.parse(adapter.fetch(json.loads(theater["adapter_config"])))
             counts = store.record_screenings(conn, theater["id"], run_id, theater["timezone"], raw)
@@ -43,8 +44,9 @@ def refresh(theater_id: str | None = None) -> int:
                 alerts.notify_recovery(theater, cfg)
             print(f"{theater['id']}: {outcome} {counts}")
         except Exception:
-            store.finish_run(conn, run_id, "error", {}, traceback.format_exc()[-2000:])
-            _alert(conn, theater, run_id, cfg)
+            if run_id is not None:
+                store.finish_run(conn, run_id, "error", {}, traceback.format_exc()[-2000:])
+                _alert(conn, theater, run_id, cfg)
             print(f"{theater['id']}: ERROR")
             exit_code = 1
     return exit_code
@@ -55,8 +57,7 @@ def _alert(conn, theater, run_id, cfg):
     try:
         alerts.notify_failure(theater, run, cfg)
     finally:
-        conn.execute("UPDATE scrape_run SET alerted=1 WHERE id=?", (run_id,))
-        conn.commit()
+        store.mark_alerted(conn, run_id)
 
 
 def record_fixtures(theater_id: str) -> int:

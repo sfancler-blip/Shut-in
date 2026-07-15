@@ -86,3 +86,11 @@ def test_was_previously_healthy():
     r1 = store.start_run(conn, "t1")
     store.finish_run(conn, r1, "ok", {"found": 5, "new": 5, "updated": 0, "cancelled": 0})
     assert store.was_previously_healthy(conn, "t1")
+
+
+def test_mark_alerted_sets_flag():
+    conn = setup_conn()
+    r1 = store.start_run(conn, "t1")
+    assert conn.execute("SELECT alerted FROM scrape_run WHERE id=?", (r1,)).fetchone()["alerted"] == 0
+    store.mark_alerted(conn, r1)
+    assert conn.execute("SELECT alerted FROM scrape_run WHERE id=?", (r1,)).fetchone()["alerted"] == 1
