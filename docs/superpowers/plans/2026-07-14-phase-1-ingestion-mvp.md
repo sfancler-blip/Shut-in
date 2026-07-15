@@ -678,6 +678,8 @@ git commit -m "feat: adapter contract (RawScreening) and polite impersonating fe
 
 Written against Task 2's fixtures, informed by Task 3's prototype (title-regex misses become test cases here). If fixture shapes contradicted recon, follow the fixtures.
 
+> **Amended after task review (2026-07-14):** the Step 3 template below has two gaps vs this plan's own contract, fixed in implementation: (1) `fetch` must honor `months_ahead` (default 2) by iterating `?search=YYYY-MM` month filters instead of paginating the entire historical event collection (~56 pages) — required by the documented interface and politeness (N1); (2) `parse` must map `show["acf"]["format"]` → `RawScreening.format` when present (F2 "when available"; the Odyssey fixture proves the field exists). The committed adapter is authoritative over the template below.
+
 **Files:**
 - Create: `shutin/adapters/wordpress_gecko.py` (replace stub), `tests/test_wordpress_gecko.py`
 
