@@ -1,0 +1,25 @@
+[project]
+name = "shutin"
+version = "0.1.0"
+description = "Movie showtimes aggregator - ingestion pipeline"
+requires-python = ">=3.12"
+dependencies = [
+    "curl_cffi>=0.15",
+    "selectolax>=0.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+shutin = "shutin.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["shutin", "shutin.adapters"]
+
+[tool.ruff]
+line-length = 100
