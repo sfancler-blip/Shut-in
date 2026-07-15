@@ -1130,7 +1130,11 @@ def setup_conn():
 
 
 def raw(title="Alien", day=20, hour=19):
-    return RawScreening(film_title=title, starts_at_local=datetime(2026, 7, day, hour, 30))
+    # AMENDED (Task 7 review): dates must be computed relative to real wall-clock —
+    # store's cancellation logic compares starts_at > _now(), so hardcoded "future"
+    # dates silently rot once the calendar passes them.
+    dt = (datetime.now() + timedelta(days=day - 13)).replace(hour=hour, minute=30, second=0, microsecond=0)
+    return RawScreening(film_title=title, starts_at_local=dt)
 
 
 def test_upsert_is_idempotent():
@@ -1745,7 +1749,9 @@ from shutin.adapters.base import RawScreening
 
 class FakeAdapter:
     fail = False
-    screenings = [RawScreening(film_title="Alien", starts_at_local=datetime(2026, 7, 20, 19, 30))]
+    # AMENDED (Task 7 review): relative future date, not hardcoded — hardcoded dates rot.
+    screenings = [RawScreening(film_title="Alien",
+                               starts_at_local=(datetime.now() + timedelta(days=7)).replace(hour=19, minute=30, second=0, microsecond=0))]
 
     @classmethod
     def fetch(cls, config):
@@ -1810,7 +1816,8 @@ def test_zero_after_healthy_is_suspicious(env):
     cli.main(["refresh"])
     row = run_row(dbfile)
     assert row["outcome"] == "zero_screenings" and alerts["fail"] == ["fake-t"]
-    FakeAdapter.screenings = [RawScreening(film_title="Alien", starts_at_local=datetime(2026, 7, 20, 19, 30))]
+    FakeAdapter.screenings = [RawScreening(film_title="Alien",
+                                           starts_at_local=(datetime.now() + timedelta(days=7)).replace(hour=19, minute=30, second=0, microsecond=0))]
 
 
 def test_recovery_closes_the_loop(env):

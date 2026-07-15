@@ -16,7 +16,7 @@ def start_run(conn, theater_id: str) -> int:
     return cur.lastrowid
 
 
-def finish_run(conn, run_id: int, outcome: str, counts: dict, error_detail=None):
+def finish_run(conn, run_id: int, outcome: str, counts: dict, error_detail: str | None = None):
     conn.execute(
         "UPDATE scrape_run SET finished_at=?, outcome=?, screenings_found=?,"
         " screenings_new=?, screenings_updated=?, screenings_cancelled=?, error_detail=?"
