@@ -45,6 +45,32 @@ times in `.showtime-square`); Agile Ticketing's documented WebSales JSON feed
 **Difficulty: Medium** (clean data, but TLS impersonation required; datetime-in-title
 parsing; event→show join).
 
+### Live verification 2026-07-14
+
+- robots.txt: **permits** our paths — `User-agent: *` / `Disallow:` (empty, Yoast block
+  only adds a sitemap line). No path restrictions at all.
+- Primary path: **confirmed**, with one correction. `GET /wp-json/wp/v2/event` and
+  `GET /wp-json/wp/v2/show?slug=…` both return 200 with the documented shape;
+  `X-WP-TotalPages`/`X-WP-Total` headers present (56 pages / 5579 events at
+  `per_page=100`). **Correction:** the title separator is an HTML-entity-encoded en dash
+  (`&#8211;`, decodes to `–`), not a literal hyphen — actual title looks like
+  `"Severin Presents &#8211; DELICATESSEN &#8211; 2026-08-24 8:00pm"`. Don't split on
+  `" - "`; `html.unescape()` the title then regex for the trailing
+  `(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2}[ap]m)$` instead. Slug de-suffixing
+  (`-\d{4}-\d{2}-\d{2}.*$`) worked as documented.
+- Fixtures: `tests/fixtures/hollywood-theatre/` (`events_p1.json`, `events_headers.json`,
+  `robots.txt`, 4× `show_*.json`) @ commit (this task's commit).
+- Poster source: **confirmed** `yoast_head_json.og_image[0].url`, but only populated when
+  the show post has a WordPress featured image (`featured_media != 0`). **Quirk found
+  live:** the first 3 shows sampled (all "label presents a reissue" screenings — Severin/
+  Vinegar Syndrome/Oscilloscope) have `featured_media: 0` and empty ACF `thumb_image`/
+  `main_image` — no poster at all, `og_image: null`. This isn't a fixture artifact, it's
+  a real content gap some show posts have; adapters must treat missing poster as valid
+  (None), not an error. Added a 4th sample (`show_the-odyssey-in-70mm.json`) which does
+  have a featured image, confirming the `og_image` path works when populated.
+- plain-curl 403 reproduced: **yes** (`curl -s -o /dev/null -w "%{http_code}"` →403).
+- curl_cffi impersonation passes: **yes** (200 on every request, robots.txt included).
+
 ---
 
 ## Cinemagic — thecinemagictheater.com
@@ -71,6 +97,40 @@ selectors, treat JSON-LD as a bonus.
   worth *asking the theater for* (small nonprofit, may cooperate).
 
 **Difficulty: Easy–Medium** (small, likely server-rendered, stable Veezi URL structure).
+
+### Live verification 2026-07-14
+
+- robots.txt: **permits** our paths — `Disallow: /ahoy`, `/graphql`, `/checkout`
+  (+ trailing-slash and wildcard variants) only; `/now-showing/` and `/movie/{slug}/` are
+  not covered.
+- Primary path: **corrected — platform is not Veezi.** `tickets.thecinemagictheater.com`
+  is a Quasar/Vue single-page app (`<div id="q-app">`), not server-rendered ASP.NET. No
+  string "veezi" appears anywhere in any fetched page. The image CDN is
+  `indy-systems.imgix.net` and in-page JS ids/messages ("Contacting Hollywood",
+  "Negotiating Distribution Deals", `indy-load-delay-message`) point to a platform
+  branded **Indy**, not Veezi — the recon's Veezi inference was wrong for this site.
+  **However**, extraction is still easy without a headless browser: every page ships a
+  hidden (`position:absolute; z-index:-1000`) SEO/accessibility div containing real
+  content — on `/now-showing/`, plain `<h1>/<h2>/<p>/<a>` markup listing every film with
+  its next showtime and a link to `/checkout/showing/{slug}/{sessionId}`; on
+  `/movie/{slug}/`, full `schema.org/Movie` **microdata** (`itemprop="name"`,
+  `description`, `genre`, `duration`, `dateCreated`, `actor`, `director`, `producer`,
+  `thumbnailUrl`, `image`) plus every remaining showtime as `<a href="…/checkout/showing/
+  {slug}/{id}">Month D, H:MM am/pm</a>`. Verified present and consistent across all 3
+  sampled movies (Obsession: 7 showtimes, Hour of the Wolf: 1, The Furious: 3).
+  **Note for Task 6:** the listing page alone carries one showtime per film — full
+  per-film showtime lists still require the `/movie/{slug}/` fetch, but a plain HTML
+  parse (regex or BeautifulSoup on `itemprop=`) is sufficient; no Veezi API, no
+  headless browser, no JSON-LD needed.
+- Fixtures: `tests/fixtures/cinemagic/` (`robots.txt`, `now_showing.html`, 3×
+  `movie_*.html`) @ commit (this task's commit).
+- Poster source: **corrected** — image at `itemprop="image"` / `itemprop="thumbnailUrl"`
+  (both point to the same `indy-systems.imgix.net` URL in samples seen), inside the
+  hidden microdata div — not a Veezi asset path.
+- [Cinemagic] JSON-LD present: **no** (zero `<script type="application/ld+json">` blocks
+  across `now_showing.html` + all 3 movie pages). Use the `schema.org` **microdata**
+  (itemprop attributes) in the hidden div instead — same structured-data benefit, no
+  JSON-LD parsing needed, and it's what's actually there.
 
 ---
 

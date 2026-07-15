@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /ahoy
+Disallow: /graphql
+Disallow: /checkout
+Disallow: /checkout/
+Disallow: /*/checkout
+Disallow: /*/checkout/

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script data-test-id="js-enabled-script">
+    function ios() {
+      let userAgent = window.navigator.userAgent.toLowerCase()
+      let safari = /safari/.test(userAgent)
+      let ios = /iphone|ipod|ipad/.test(userAgent) || (/macintosh/.test(userAgent) && window.navigator.maxTouchPoints > 0)
+
+      return ios && !safari
+    }
+
+    const loadingMessage = [
+      'Popping the popcorn',
+      'Starting the projectors',
+      'Contacting Hollywood',
+      'Negotiating Distribution Deals',
+      'Splicing the Film',
+      'Sweeping the Auditorium'
+    ]
+    function showDelayLoadMessage(attempt = 1) {
+      const loadDelayMessageElement = document.getElementById('indy-load-delay-message')
+
+      if (!loadDelayMessageElement) return
+
+      if (attempt === 1) {
+        loadDelayMessageElement.style.display = "block"
+      } else {
+        loadDelayMessageElement.children[0].textContent = loadingMessage[(attempt - 2) % loadingMessage.length]
+      }
+
+      setTimeout(() => {
+        showDelayLoadMessage(attempt + 1)
+      }, 5000)
+    }
+    setTimeout(() => {
+      showDelayLoadMessage()
+    }, 7500)
+  </script>
+  <script data-test-id="splash-image-script">
+    const splashImageEl = document.getElementById('splash-image')
+    const qAppEl = document.getElementById('q-app-splash-screen')
+
+    if (splashImageEl && qAppEl && localStorage.splashImageUrl && localStorage.splashBackgroundColor) {
+      splashImageEl.src = localStorage.splashImageUrl
+
+      splashImageEl.onload = function () {
+        if (splashImageEl.naturalWidth > 0 && splashImageEl.naturalHeight > 0) {
+          rendered()
+          return
+        }
+        const interval = setInterval(() => {
+          if (splashImageEl.naturalWidth > 0 && splashImageEl.naturalHeight > 0) {
+            clearInterval(interval);
+            rendered();
+          }
+        }, 5);
+      }
+      function rendered() {
+        qAppEl.style.backgroundColor = localStorage.splashBackgroundColor
+      }
+    }
+  </script>
+  <script type="application/ld+json" data-test-id="schema-org-data">
+    {"@context":"https://schema.org","@type":"MovieTheater","name":"Cinemagic | The Cinemagic","brand":"Cinemagic","description":"Check showtimes and buy tickets at your local cinema","address":{"@type":"PostalAddress","streetAddress":"2021 SE Hawthorne Blvd","addressLocality":"Portland","postalCode":"97214","addressRegion":"Oregon","addressCountry":"US"},"telephone":"9712718257","email":"info@thecinemagictheater.com","geo":{"@type":"GeoCoordinates","latitude":45.5123192,"longitude":-122.6450545},"screenCount":1,"logo":"https://indy-systems.imgix.net/q3glzbc0o0d8r8jve978qolddlmr?w=400&fm=png&auto=format","url":"https://tickets.thecinemagictheater.com/"}
+  </script>
+  <title>Cinemagic | The Cinemagic | The Furious</title>
+  <link rel="canonical" href="https://tickets.thecinemagictheater.com/movie/the-furious/">
+  <meta charset=utf-8>
+  <meta name="description" content="After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.
+
+Starring Xie Miao, Joe Taslim, Yang Enyou">
+  <meta property="og:description" content="After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.
+
+Starring Xie Miao, Joe Taslim, Yang Enyou">
+  <meta name="twitter:description" content="After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.
+
+Starring Xie Miao, Joe Taslim, Yang Enyou">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="msapplication-tap-highlight" content="no">
+  <meta name="viewport"
+    content="user-scalable=no,initial-scale=1,maximum-scale=1,minimum-scale=1,width=device-width,viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="twitter:title" content="The Furious"><meta name="twitter:site" content="@"><meta name="twitter:url" content="https://tickets.thecinemagictheater.com/movie/the-furious"><meta name="twitter:card" content="summary"><meta property="og:title" content="The Furious"><meta property="og:site_name" content="The Cinemagic"><meta property="og:type" content="website"><meta name="description" content="After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.
+
+Starring Xie Miao, Joe Taslim, Yang Enyou"><meta property="og:url" content="https://tickets.thecinemagictheater.com/movie/the-furious"><meta property="og:description" content="After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.
+
+Starring Xie Miao, Joe Taslim, Yang Enyou"><meta name="twitter:description" content="After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.
+
+Starring Xie Miao, Joe Taslim, Yang Enyou"><meta name="image" content="https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop&w=1000&height=500&fm=jpeg&auto=format"><meta name="twitter:image" content="https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop&w=1000&height=500&fm=jpeg&auto=format"><meta property="og:image" content="https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop&w=1000&height=500&fm=jpeg&auto=format"><script type="application/ld+json" data-test-id="schema-org-data">{"@context":"https://schema.org","@type":"Movie","name":"The Furious","description":"After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.","genre":"Action","duration":"PT1H53M","dateCreated":"2026-06-12","keywords":"","sameAs":"https://tickets.thecinemagictheater.com/movie/the-furious","actor":[{"@type":"Person","name":"Xie Miao"},{"@type":"Person","name":"Joe Taslim"},{"@type":"Person","name":"Yang Enyou"}],"director":[{"@type":"Person","name":"Kenji Tanigaki"}],"producer":[{"@type":"Person","name":"Frank Hui"},{"@type":"Person","name":"Bill Kong Chi-Keung"},{"@type":"Person","name":"Tam Chi-San"}],"thumbnailUrl":"https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop\u0026w=1000\u0026h=500\u0026fm=jpeg\u0026auto=format","image":"https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop\u0026w=1000\u0026h=500\u0026fm=jpeg\u0026auto=format","trailer":{"@type":"VideoObject","@id":"https://www.youtube.com/embed/Avky8dVaqAI","name":"The Furious","description":"After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.","thumbnail":"https://i.ytimg.com/vi_webp/Avky8dVaqAI/maxresdefault.webp"}}</script>
+  <link rel=icon type=image/png sizes=128x128
+    href="https://indy-systems.imgix.net/jc0ekvvlzzfxyrz38p4xg5udvq5q?fm=png&w=128&h=128&fit=fill&fill=solid&auto=format">
+  <link rel=icon type=image/png sizes=96x96
+    href="https://indy-systems.imgix.net/jc0ekvvlzzfxyrz38p4xg5udvq5q?fm=png&w=96&h=96&fit=fill&fill=solid&auto=format">
+  <link rel=icon type=image/png sizes=32x32
+    href="https://indy-systems.imgix.net/jc0ekvvlzzfxyrz38p4xg5udvq5q?fm=png&w=32&h=32&fit=fill&fill=solid&auto=format">
+  <link rel=icon type=image/png sizes=16x16
+    href="https://indy-systems.imgix.net/jc0ekvvlzzfxyrz38p4xg5udvq5q?fm=png&w=16&h=16&fit=fill&fill=solid&auto=format">
+  <link href="/fontawesome/css/fontawesome.min.css" rel="stylesheet">
+  <link href="/fontawesome/css/light.min.css" rel="stylesheet">
+  <link href="/fontawesome/css/solid.min.css" rel="stylesheet">
+  <link href="/fontawesome/css/brands.min.css" rel="stylesheet">
+  <link rel=icon type=image/ico href="https://indy-systems.imgix.net/foc82pg2ut81yjobs5tbuz8q3mm9?fm=png&w=32&h=32&fit=fill&fill=solid&auto=format">
+  <link rel="shortcut icon" href="https://indy-systems.imgix.net/jc0ekvvlzzfxyrz38p4xg5udvq5q?fm=png&w=128&h=128&fit=fill&fill=solid&auto=format">
+  <link rel=apple-touch-icon
+    href="https://indy-systems.imgix.net/sen5xoo6ro0mdwcyvos5vnprye5f?fm=png&w=128&h=128&fit=fill&fill=solid&pad=9&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=828&h=1792&fit=fillmax&fill=solid&pad=60&fill-color=2c4068&bg=2c4068&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=1125&h=2436&fit=fillmax&fill=solid&pad=60&fill-color=2c4068&bg=2c4068&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=1242&h=2688&fit=fillmax&fill=solid&pad=60&fill-color=2c4068&bg=2c4068&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=750&h=1334&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=1242&h=2208&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=640&h=1136&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=1536&h=2048&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=1668&h=2224&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=1668&h=2388&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=apple-touch-startup-image
+    media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
+    href="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?fm=png&w=2048&h=2732&fit=fillmax&fill=solid&pad=60&fill-color=d6ae29&bg=d6ae29&auto=format">
+  <link rel=stylesheet href=https://use.typekit.net/hwu0dkh.css>
+  <style>
+    @font-face {
+      font-family: "bebas-neue";
+      src: url("/fonts/BebasNeue-Regular.ttf") format("opentype");
+      font-display: auto;
+      font-style: normal;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+    }
+
+    body {
+      font-family: brandon-grotesque, sans-serif;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    .text-h1,
+    .text-h2,
+    .text-h3,
+    .text-h4,
+    .text-h5,
+    .text-h6 {
+      font-family: bebas-neue, sans-serif;
+      font-style: normal;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+    }
+
+    .q-header .menu .q-btn {
+      font-family: bebas-neue, sans-serif;
+      font-size: calc(1em + 0.5vmin);
+      font-style: normal;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+    }
+  </style>
+  <link href=/css/ rel=stylesheet>
+  <link href=/css/app.bd5d9d36.css rel=stylesheet>
+  
+</head>
+
+<body style="background-color: #f7eaba;">
+  <script> (function(){ var s = document.createElement('script'); var h = document.querySelector('head') || document.body; s.src = 'https://acsbapp.com/apps/app/dist/js/app.js'; s.async = true; s.onload = function(){ acsbJS.init({ statementLink : '', footerHtml : '', hideMobile : false, hideTrigger : false, disableBgProcess : false, language : 'en', position : 'right', leadColor : '#a33535', triggerColor : '#a33535', triggerRadius : '50%', triggerPositionX : 'right', triggerPositionY : 'bottom', triggerIcon : 'people', triggerSize : 'medium', triggerOffsetX : 20, triggerOffsetY : 20, mobile : { triggerSize : 'small', triggerPositionX : 'right', triggerPositionY : 'bottom', triggerOffsetX : 10, triggerOffsetY : 85, triggerRadius : '50%' } }); }; h.appendChild(s); })(); </script>
+  <div id="q-app">
+    <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; z-index: -1000;">
+      <div itemscope itemtype="https://schema.org/Movie"><h1 itemprop="name">The Furious</h1><span itemprop="description">After the daughter of Wang Wei is kidnapped by a criminal network and he receives no help from the corrupt police, Wei sets out on a rampage to find her himself. His only ally is Navin – a relentless journalist whose wife has mysteriously disappeared. Fueled by a furious vengeance, the unlikely duo ruthlessly fights against the kidnappers in this explosive martial arts showdown.</span><span itemprop="genre">Action</span><span itemprop="duration">PT1H53M</span><span itemprop="dateCreated">2026-06-12</span><span itemprop="countryOfOrigin">HK</span><span itemprop="originalLanguage">zh</span><div itemprop="actor" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Xie Miao</span></div><div itemprop="actor" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Joe Taslim</span></div><div itemprop="actor" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Yang Enyou</span></div><div itemprop="director" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Kenji Tanigaki</span></div><div itemprop="author" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Lei Zhilong</span></div><div itemprop="author" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Mak Tin-Shu</span></div><div itemprop="author" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Frank Hui</span></div><div itemprop="author" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Shum Kwan-Sin</span></div><div itemprop="producer" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Frank Hui</span></div><div itemprop="producer" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Bill Kong Chi-Keung</span></div><div itemprop="producer" itemscope itemtype="https://schema.org/Person"><span itemprop="name">Tam Chi-San</span></div><a itemprop="thumbnailUrl" href="https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop&w=1000&h=500&fm=jpeg&auto=format">The Furious"</a><a itemprop="image" href="https://indy-systems.imgix.net/bnggbloekrqmev0xewgw9314bnaq?fit=crop&w=1000&h=500&fm=jpeg&auto=format">The Furious"</a></div><h1>Showtimes</h1><h2><a href="https://tickets.thecinemagictheater.com/checkout/showing/the-furious/3475518">July 14, 9:00 pm</a></h2><h2><a href="https://tickets.thecinemagictheater.com/checkout/showing/the-furious/3475521">July 15, 4:30 pm</a></h2><h2><a href="https://tickets.thecinemagictheater.com/checkout/showing/the-furious/3510394">July 23, 4:30 pm</a></h2>
+    </div>
+    <div
+      class="q-app-splash-screen"
+      style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: #2c4068;">
+      <div style="height: 100%; width: 100%;">
+        <div style="text-align: center;">
+          <div
+            style="width: 90%; max-width: 600px; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <img alt="The Cinemagic Theater"
+              src="https://indy-systems.imgix.net/gieqoglqqcg66br60oj44t7t9gzi?w=1200&auto=format"
+              style="width: 100%" id="splash-image">
+          </div>
+        </div>
+        <div id="indy-load-delay-message"
+          style="position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; display: none;">
+          <span
+            style="padding: 10px 20px; background-color: #00000066; color: white; font-size: large; font-weight: bold; border-radius: 10px;">
+            Loading...
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src=/js/vendor.16add904.js></script>
+  <script src=/js/app.c4c35c03.js></script>
+</body>
+</html>
