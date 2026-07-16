@@ -79,10 +79,15 @@ nondeterministic — violates N2/N4). See `docs/02-ingestion-architecture.md` §
 ## Step 4 — Capture fixtures
 
 Record the real responses (HTML/JSON) for every URL the adapter will touch into
-`tests/fixtures/<theater-id>/`, with a `README` noting capture date and source URLs.
-Adapters are developed and tested against fixtures, never against the live site — this
-keeps tests fast, deterministic, and polite, and makes future site redesigns show up as
-a fixture-test failure with a diffable artifact.
+`tests/fixtures/<theater-id>/`, with a `README.md` noting capture date, exact source
+URLs/params, and anything about the response shape that shaped a design decision (a
+missing field, an entity-encoding surprise, a query-scoping default worth relying on).
+Actually write this file — the two theaters onboarded before Clinton St skipped it, and
+the only way to recover "why does this fixture look like this" later is to re-derive it
+from the adapter code, which defeats the point of checking fixtures in at all. Adapters
+are developed and tested against fixtures, never against the live site — this keeps
+tests fast, deterministic, and polite, and makes future site redesigns show up as a
+fixture-test failure with a diffable artifact.
 
 ## Step 5 — Adapter work
 
@@ -105,7 +110,15 @@ Honor the adapter contract (`docs/02-ingestion-architecture.md`) — the review 
    AM/PM, missing late shows, and duplicated series entries are all caught here, cheaply.
 2. Dry-run against the live site (fetch + parse, no DB writes) and compare counts with
    the fixture run.
-3. Run TMDB matching in report mode: match rate and the list of low-confidence titles.
+3. Check the TMDB match rate. There is no separate report-only mode — `enrich.py` only
+   runs for real, inside `refresh`, when `TMDB_API_KEY` is set and the theater's toggle is
+   on. That's fine to run as the actual validation step: enrichment failures never block
+   storage (F4/N2) and matched films are cached, so it's safe and cheap to just do the
+   real run and then query `SELECT enrichment_status, COUNT(*) FROM film GROUP BY
+   enrichment_status` (and `tmdb_match_confidence` for the borderline ones) afterward.
+   If validating locally without a key, this step is a no-op (`enrichment_status` stays
+   `pending` for every film) — the real match-rate check happens on the box where the key
+   is configured, as part of Step 7's first real run, not before it.
    Repertory programs ("Shorts Night", "Movie + Q&A") legitimately won't match — that's
    what `enrichment_status = no_match` and the theater-level toggle are for.
 
@@ -136,3 +149,12 @@ Honor the adapter contract (`docs/02-ingestion-architecture.md`) — the review 
 - `references/veezi.md` — Veezi Web extraction recipe (from Cinemagic recon)
 - `references/wordpress-gecko.md` — WordPress/gecko-theme + Agile recipe (from Hollywood
   Theatre recon), including the Cloudflare TLS story and known API quirks
+- `references/events-calendar.md` — WordPress "The Events Calendar" plugin recipe (from
+  Clinton St Theater recon): `/wp-json/tribe/events/v1/events` field mapping and the
+  default-query upcoming-only scoping gotcha. Applies to Clinton Street now; PAM/Whitsell
+  is the next theater expected on this platform (`docs/02-ingestion-architecture.md`).
+
+If you author a new platform adapter and this list doesn't have a matching reference file
+yet, write one before moving on (see `events-calendar.md` for the shape) — a fingerprint
+in `platform-detection.md` alone isn't enough to make the *next* theater on that platform
+config-only; the extraction recipe and quirks need to live somewhere too.
