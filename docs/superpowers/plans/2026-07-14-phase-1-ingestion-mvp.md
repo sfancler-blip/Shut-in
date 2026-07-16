@@ -2274,19 +2274,19 @@ git commit -m "feat: Hollywood fetch relay - payload ingest CLI, Windows relay s
 
 ### Task 12: Alert drill — deliberately induced failure (exit criterion)
 
-- [ ] **Step 1: Break one theater on purpose** — on the VPS (or locally against the prod DB copy):
+<!-- AMENDED (post-Task 11b, 2026-07-16): (1) SMTP was skipped by user decision — the email
+     channel is disabled on the VPS; expected email evidence is the printed disabled-warning,
+     GitHub is the live channel under drill. (2) hollywood-theatre cannot fetch green from the
+     VPS (Cloudflare DC-IP 403), so the recovery leg runs via the relay's --payload ingest,
+     which is also the production path. -->
 
-```sql
-UPDATE theater SET adapter_config='{"base_url": "https://hollywoodtheatre.org/nonexistent"}'
-WHERE id='hollywood-theatre';
-```
+- [ ] **Step 1: Break one theater on purpose** — on the VPS, `shutin refresh --theater hollywood-theatre` (plain fetch) already fails genuinely at Cloudflare; use that as the induced failure (no config mutation needed — restore is then a no-op).
 
-Run `shutin refresh --theater hollywood-theatre`.
-Expected: run outcome `error`, **email received** at ALERT_EMAIL, **GitHub issue opened** titled `[scraper-broken] hollywood-theatre` with the fixture command + debug-skill links in the body.
+Expected: run outcome `error`, **GitHub issue opened** titled `[scraper-broken] hollywood-theatre` with the fixture command + debug-skill links in the body (email channel disabled — warning printed, no email).
 
 - [ ] **Step 2: Verify repeat-failure dedup** — run refresh again. Expected: no second issue; a new comment on the existing one.
 
-- [ ] **Step 3: Restore and verify recovery** — fix `adapter_config`, run refresh. Expected: green run, issue auto-closed with a comment.
+- [ ] **Step 3: Verify recovery via the relay path** — trigger the Windows relay (`Start-ScheduledTask "ShutIn Hollywood Relay"` or run `deploy/relay-hollywood.ps1` manually). Expected: green `--payload` ingest run on the VPS, issue auto-closed with a comment.
 
 - [ ] **Step 4: Record the drill** — append results to `docs/08-operations.md` ("Alert drill 2026-MM-DD: pass"). Commit:
 
