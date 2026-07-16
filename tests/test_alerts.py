@@ -126,6 +126,30 @@ def test_smtp_failure_is_nonfatal(monkeypatch, capsys):
     assert "failed" in capsys.readouterr().out.lower()
 
 
+def test_github_api_sends_user_agent(monkeypatch):
+    """Regression: GitHub's API rejects UA-less requests with a bare 403 (real VPS
+    incident, fixed in 867f377) — lock the header in so it can't silently regress."""
+    captured = {}
+
+    class FakeResponse:
+        content = b"[]"
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return []
+
+    def fake_request(method, url, **kw):
+        captured["headers"] = kw.get("headers")
+        return FakeResponse()
+
+    monkeypatch.setattr(alerts.requests, "request", fake_request)
+    alerts._github_api("GET", "https://api.github.com/repos/user/shut-in/issues", CFG)
+    assert captured["headers"]["User-Agent"]
+    assert captured["headers"]["Authorization"] == "Bearer t"
+
+
 def test_recovery_github_failure_is_nonfatal(monkeypatch, capsys):
     def raising_api(*a, **k):
         raise RuntimeError("rate limited")

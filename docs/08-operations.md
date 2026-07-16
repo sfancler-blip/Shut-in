@@ -100,12 +100,14 @@ a `started_at` after the temporary edit, then reinstall the real schedule from
 
 ## Logs
 
-The refresh cron redirects stdout/stderr to `/home/shutin/shut-in/refresh.log`
-(append mode — rotate/truncate manually if it grows large; there's no log rotation
-configured yet). Tail it with:
+The refresh cron redirects stdout/stderr to `/home/shutin/shut-in/refresh.log`, and the
+backup cron redirects to `/home/shutin/shut-in/backup.log` (both append mode — rotate/
+truncate manually if they grow large; there's no log rotation configured yet). Tail them
+with:
 
 ```bash
 tail -n 50 /home/shutin/shut-in/refresh.log
+tail -n 50 /home/shutin/shut-in/backup.log
 ```
 
 Per-run outcomes also live in the `scrape_run` table (`outcome`, `error_detail`,
@@ -168,12 +170,18 @@ Then reinstall the crontab (`crontab -u shutin deploy/crontab.example`) once sat
   works correctly around it (the failure is recorded as an `error` `scrape_run` row,
   `refresh.log` captures it, and the pipeline still completes the other theater and
   exits non-zero as designed).
-- **The GitHub-issue alert channel currently gets HTTP 403 on issue creation** even
-  though the token has `repo` scope and a plain `GET` of the issues list with the same
-  token succeeds. Likely a permission restriction on the specific OAuth-app token in
-  use for the `POST`; needs a token audit before the auto-filed-issue alert channel can
-  be relied on. Until fixed, failures are visible via `scrape_run` rows and
-  `refresh.log` only (email channel is intentionally unset per the current setup).
+- ~~The GitHub-issue alert channel gets HTTP 403 on issue creation~~ **Fixed** (commit
+  `867f377`): `_github_api` sent no `User-Agent` header, and GitHub's API rejects
+  UA-less requests with a bare `HTTP Error 403` regardless of token scope — not a
+  token/permission problem. Added `User-Agent: shutin-alerts` to the request headers
+  and locked it in with a regression test (`tests/test_alerts.py::test_github_api_sends_user_agent`).
+  Verified live from the VPS: an authenticated `GET` through the real
+  `alerts._github_api` code path returned `200` with the issue list. The write path
+  (issue `POST`) gets exercised for real the next time a theater fails and
+  `notify_failure` runs — including the ongoing `hollywood-theatre` failure above, which
+  will file/update a real `[scraper-broken] hollywood-theatre` issue. The GitHub channel
+  is expected to work in production now; SMTP remains intentionally unconfigured (no
+  creds provided), so email stays a "channel disabled" no-op until that's supplied.
 
 ## Deploying a new commit
 

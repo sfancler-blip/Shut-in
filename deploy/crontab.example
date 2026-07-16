@@ -7,4 +7,4 @@
 0 13 * * *  cd /home/shutin/shut-in && set -a && . ./shutin.env && set +a && .venv/bin/shutin refresh >> refresh.log 2>&1
 
 # nightly sqlite backup (WAL-safe), 11:30 UTC, 7-day rotation by day-of-week
-30 11 * * * sqlite3 /home/shutin/shutin.db ".backup /home/shutin/backups/shutin-$(date +\%u).db"
+30 11 * * * sqlite3 /home/shutin/shutin.db ".backup /home/shutin/backups/shutin-$(date +\%u).db" >> /home/shutin/shut-in/backup.log 2>&1
