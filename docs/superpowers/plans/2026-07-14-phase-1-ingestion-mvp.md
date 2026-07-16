@@ -2047,6 +2047,231 @@ git commit -m "feat: VPS deployment - cron, env template, backup, operations doc
 
 ---
 
+### Task 11b: Hollywood fetch relay — Windows residential IP → VPS ingest
+
+<!-- AMENDED (post-Task 11, user decision 2026-07-16): hollywoodtheatre.org Cloudflare-403s
+     the Hetzner datacenter IP; the same curl_cffi request passes from a residential IP.
+     User chose: interim relay from the Windows desktop until a home microserver exists.
+     Leverages the adapter contract's pure fetch/parse split — fetch runs on Windows,
+     parse+store runs on the VPS from a shipped payload file. -->
+
+**Files:**
+- Modify: `shutin/cli.py`
+- Create: `deploy/relay-hollywood.ps1`
+- Test: `tests/test_cli.py`
+- Modify: `deploy/crontab.example`, `docs/08-operations.md`
+
+**Interfaces:**
+- Produces: `shutin fetch-payload --theater ID --out FILE` (adapter fetch only, dump JSON);
+  `shutin refresh --theater ID --payload FILE` (skip fetch, parse+store the file);
+  `shutin refresh --exclude ID` (run all enabled theaters except ID).
+- Consumes: `ADAPTERS[name].fetch(config) -> payload` / `.parse(payload) -> list[RawScreening]`
+  (Task 4); payload for `wordpress_gecko` is pure JSON (`{"events": [...], "shows": {...}}`)
+  so it round-trips through a file losslessly.
+
+- [ ] **Step 1: Write the failing tests** — append to `tests/test_cli.py` (add `import json` to its imports):
+
+```python
+def test_refresh_payload_skips_fetch(env, tmp_path, monkeypatch):
+    dbfile, alerts = env
+    payload_file = tmp_path / "p.json"
+    payload_file.write_text('{"x": 1}', encoding="utf-8")
+
+    def boom(config):
+        raise AssertionError("fetch must not run in payload mode")
+
+    monkeypatch.setattr(FakeAdapter, "fetch", boom)
+    assert cli.main(["refresh", "--theater", "fake-t", "--payload", str(payload_file)]) == 0
+    row = run_row(dbfile)
+    assert row["outcome"] == "ok" and row["screenings_found"] == 1
+
+
+def test_refresh_exclude(env):
+    dbfile, alerts = env
+    assert cli.main(["refresh", "--exclude", "fake-t"]) == 0
+    assert run_row(dbfile) is None  # the only theater was excluded -> no run rows
+
+
+def test_payload_requires_theater(env):
+    with pytest.raises(SystemExit) as e:
+        cli.main(["refresh", "--payload", "x.json"])
+    assert e.value.code == 2  # argparse usage error
+
+
+def test_fetch_payload_writes_file(env, tmp_path):
+    dbfile, alerts = env
+    out = tmp_path / "out.json"
+    assert cli.main(["fetch-payload", "--theater", "fake-t", "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8")) == {"x": 1}
+```
+
+- [ ] **Step 2: Run to verify they fail**
+
+Run: `pytest tests/test_cli.py -v`
+Expected: the four new tests FAIL (unrecognized arguments / invalid choice 'fetch-payload').
+
+- [ ] **Step 3: Implement in `shutin/cli.py`**
+
+`refresh()` signature and body changes:
+
+```python
+def refresh(theater_id: str | None = None, payload_file: str | None = None,
+            exclude: str | None = None) -> int:
+    conn = _conn()
+    db.migrate(conn)
+    cfg = alerts.config_from_env()
+    q = "SELECT * FROM theater WHERE enabled=1"
+    rows = conn.execute(q + " AND id=?", (theater_id,)).fetchall() if theater_id \
+        else conn.execute(q).fetchall()
+    if exclude:
+        rows = [t for t in rows if t["id"] != exclude]
+```
+
+and inside the per-theater try, replace the single fetch/parse line with:
+
+```python
+            adapter = ADAPTERS[theater["adapter"]]
+            if payload_file:
+                payload = json.loads(pathlib.Path(payload_file).read_text(encoding="utf-8"))
+            else:
+                payload = adapter.fetch(json.loads(theater["adapter_config"]))
+            raw = adapter.parse(payload)
+```
+
+New subcommand function:
+
+```python
+def fetch_payload(theater_id: str, out: str) -> int:
+    """Adapter fetch only — for relaying a payload from a network that can reach the site."""
+    conn = _conn()
+    db.migrate(conn)
+    t = conn.execute("SELECT * FROM theater WHERE id=?", (theater_id,)).fetchone()
+    if t is None:
+        print(f"unknown theater: {theater_id}")
+        return 1
+    adapter = ADAPTERS[t["adapter"]]
+    payload = adapter.fetch(json.loads(t["adapter_config"]))
+    pathlib.Path(out).write_text(json.dumps(payload, default=str), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+```
+
+`main()` argparse wiring:
+
+```python
+    r = sub.add_parser("refresh")
+    r.add_argument("--theater")
+    r.add_argument("--payload", help="pre-fetched payload JSON file; requires --theater")
+    r.add_argument("--exclude", help="theater id to skip")
+    fp = sub.add_parser("fetch-payload")
+    fp.add_argument("--theater", required=True)
+    fp.add_argument("--out", required=True)
+    args = p.parse_args(argv)
+    if args.cmd == "migrate":
+        print(db.migrate(_conn()) or "up to date")
+        return 0
+    if args.cmd == "refresh":
+        if args.payload and not args.theater:
+            p.error("--payload requires --theater")
+        return refresh(args.theater, args.payload, args.exclude)
+    if args.cmd == "fetch-payload":
+        return fetch_payload(args.theater, args.out)
+    return record_fixtures(args.theater)
+```
+
+- [ ] **Step 4: Run tests**
+
+Run: `pytest tests/ -v` and `ruff check .`
+Expected: full suite PASS (52 tests), ruff clean.
+
+- [ ] **Step 5: Write `deploy/relay-hollywood.ps1`**
+
+```powershell
+# Shut-in Hollywood relay: fetch from this (residential) IP, ship to VPS, trigger ingest.
+# Scheduled daily via Windows Task Scheduler (see docs/08-operations.md).
+$ErrorActionPreference = "Stop"
+$repo = "C:\Users\Fancy\Documents\Obsidian Vault\Claude Projects\Shut-in"
+$vps = "root@5.78.194.128"
+$payload = Join-Path $env:TEMP "hollywood-payload.json"
+
+Start-Transcript -Path (Join-Path $repo "relay.log") -Append
+try {
+    Set-Location $repo
+    $env:SHUTIN_DB = Join-Path $repo "relay.db"   # local scratch DB (gitignored), only theater config is read
+    & "$repo\.venv\Scripts\shutin.exe" fetch-payload --theater hollywood-theatre --out $payload
+    if ($LASTEXITCODE -ne 0) { throw "fetch-payload failed: $LASTEXITCODE" }
+    scp $payload "${vps}:/home/shutin/inbox/hollywood-payload.json"
+    if ($LASTEXITCODE -ne 0) { throw "scp failed: $LASTEXITCODE" }
+    ssh $vps "chown shutin:shutin /home/shutin/inbox/hollywood-payload.json && sudo -u shutin bash -c 'cd /home/shutin/shut-in && set -a && . ./shutin.env && set +a && .venv/bin/shutin refresh --theater hollywood-theatre --payload /home/shutin/inbox/hollywood-payload.json'"
+    if ($LASTEXITCODE -ne 0) { throw "remote ingest failed: $LASTEXITCODE" }
+} finally {
+    Stop-Transcript
+}
+```
+
+Add `relay.db` and `relay.log` to `.gitignore`.
+
+- [ ] **Step 6: Windows one-time setup + live fetch verification**
+
+- Ensure the repo venv exists and has the package: `.venv\Scripts\pip install -e .[dev]`
+  (create `python -m venv .venv` first if missing; Python ≥3.12).
+- Run the fetch live: `.venv\Scripts\shutin fetch-payload --theater hollywood-theatre --out %TEMP%\hollywood-payload.json`
+  with `SHUTIN_DB` pointed at a scratch path.
+  Expected: exit 0; the JSON contains ≥50 events (residential IP passes Cloudflare).
+
+- [ ] **Step 7: VPS one-time setup + live ingest verification**
+
+Over ssh (`root@5.78.194.128` — key already authorized; NEVER touch /opt/insider or existing units):
+
+```bash
+mkdir -p /home/shutin/inbox && chown shutin:shutin /home/shutin/inbox
+# update code to the pushed branch commit (repo is private; use the gh CLI token from Windows,
+# same scrubbed-URL procedure as docs/08 — never store the token on the VPS)
+cd /home/shutin/shut-in && sudo -u shutin git pull https://<TOKEN>@github.com/sfancler-blip/Shut-in.git
+sudo -u shutin .venv/bin/pip install -e /home/shutin/shut-in
+```
+
+Then run the relay script once from Windows (`powershell -NoProfile -ExecutionPolicy Bypass -File deploy\relay-hollywood.ps1`).
+Expected: script exits clean; on the VPS a new `scrape_run` row for hollywood-theatre with outcome `ok` and screenings_found > 100. Since the previous hollywood run had `alerted=1`, this ok run should fire `notify_recovery` and close the open [scraper-broken] GitHub issue — verify the issue closed.
+
+- [ ] **Step 8: Update the VPS crontab + `deploy/crontab.example`**
+
+The daily 13:00 UTC VPS refresh must stop trying (and failing) hollywood's fetch:
+
+```cron
+# daily refresh (all theaters except hollywood — relayed from residential IP), 13:00 UTC
+0 13 * * *  cd /home/shutin/shut-in && set -a && . ./shutin.env && set +a && .venv/bin/shutin refresh --exclude hollywood-theatre >> refresh.log 2>&1
+```
+
+Apply the same change to the live crontab (`crontab -u shutin -e` equivalent via `crontab -u shutin -l | ... | crontab -u shutin -`). Backup line unchanged.
+
+- [ ] **Step 9: Register the Windows scheduled task and verify it fires**
+
+```powershell
+$repo = "C:\Users\Fancy\Documents\Obsidian Vault\Claude Projects\Shut-in"
+$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$repo\deploy\relay-hollywood.ps1`""
+$trigger = New-ScheduledTaskTrigger -Daily -At 5:45am
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable
+Register-ScheduledTask -TaskName "ShutIn Hollywood Relay" -Action $action -Trigger $trigger -Settings $settings
+Start-ScheduledTask -TaskName "ShutIn Hollywood Relay"   # fire once now to verify end-to-end
+```
+
+Expected: task result 0 (`Get-ScheduledTaskInfo "ShutIn Hollywood Relay"`), `relay.log` transcript shows the full chain, fresh `scrape_run` ok row on the VPS.
+
+- [ ] **Step 10: Update `docs/08-operations.md`**
+
+Add a "Hollywood relay (interim)" section: why (Cloudflare DC-IP 403), the architecture (Windows fetch → scp → `--payload` ingest), where the scheduled task and `relay.log` live, how to run the relay manually, and a Known-issues note: **if the Windows box is off, hollywood silently gets no run that day (no alert fires — silence, not error)**; retire the relay when the home microserver lands.
+
+- [ ] **Step 11: Commit**
+
+```bash
+git add shutin/cli.py tests/test_cli.py deploy/ docs/08-operations.md .gitignore
+git commit -m "feat: Hollywood fetch relay - payload ingest CLI, Windows relay script, cron exclude"
+```
+
+---
+
 ### Task 12: Alert drill — deliberately induced failure (exit criterion)
 
 - [ ] **Step 1: Break one theater on purpose** — on the VPS (or locally against the prod DB copy):
