@@ -9,3 +9,5 @@ shutin.env
 refresh.log
 backup.log
 backups/
+relay.db
+relay.log

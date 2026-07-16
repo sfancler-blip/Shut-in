@@ -89,7 +89,7 @@ The box runs UTC. Schedule:
 
 | Time (UTC) | Job |
 |---|---|
-| 13:00 | `shutin refresh` — daily showtimes refresh (~05:00–06:00 Pacific depending on DST) |
+| 13:00 | `shutin refresh --exclude hollywood-theatre` — daily showtimes refresh for all theaters except Hollywood, which is relayed separately (~05:00–06:00 Pacific depending on DST); see "Hollywood relay (interim)" below |
 | 11:30 | nightly SQLite backup (`.backup`), rotated across 7 files by day-of-week |
 
 To confirm cron actually fires end-to-end (recommended once after any crontab change):
@@ -159,17 +159,52 @@ sqlite3 /home/shutin/shutin.db ".restore /home/shutin/backups/shutin-<n>.db"
 
 Then reinstall the crontab (`crontab -u shutin deploy/crontab.example`) once satisfied.
 
-## Known issues (as of first live VPS run)
+## Hollywood relay (interim)
 
-- **Hollywood Theatre returns a Cloudflare JS-challenge (403) from this VPS's IP.**
-  `cinemagic` scrapes clean; `hollywood-theatre` currently errors every run because
-  Cloudflare challenges the Hetzner datacenter IP regardless of the `curl_cffi`
-  TLS-impersonation that defeats it from residential/dev-machine IPs. This is a
-  scraper/adapter concern (see `.claude/skills/debug-theater-scraper`), not a
-  deployment-configuration problem — the cron/env/backup plumbing in this doc all
-  works correctly around it (the failure is recorded as an `error` `scrape_run` row,
-  `refresh.log` captures it, and the pipeline still completes the other theater and
-  exits non-zero as designed).
+**Why:** hollywoodtheatre.org Cloudflare-challenges (403) requests from the VPS's Hetzner
+datacenter IP, even with the same `curl_cffi` TLS-impersonation that passes cleanly from
+a residential IP. Rather than fight Cloudflare from the datacenter, Hollywood's fetch is
+relayed from this Windows desktop's residential IP until a dedicated home microserver
+exists (see the `home-microserver-plan` note).
+
+**Architecture:** the adapter contract already splits `fetch()` (network) from `parse()`
+(pure). A scheduled task on the Windows desktop runs
+[deploy/relay-hollywood.ps1](../deploy/relay-hollywood.ps1) daily, which:
+
+1. Runs `shutin fetch-payload --theater hollywood-theatre --out <TEMP>\hollywood-payload.json`
+   locally (residential IP passes Cloudflare; writes the adapter's raw JSON payload, no parsing).
+2. `scp`s the payload to `/home/shutin/inbox/hollywood-payload.json` on the VPS.
+3. `ssh`es in and runs `shutin refresh --theater hollywood-theatre --payload <path>` as the
+   `shutin` user, which skips `fetch()` entirely and parses+stores the shipped payload.
+
+The VPS's own 13:00 UTC cron now runs `shutin refresh --exclude hollywood-theatre` so it no
+longer wastes a run failing Hollywood's fetch itself (see Cron section above).
+
+**Where things live:**
+- Scheduled task: Windows Task Scheduler, task name `ShutIn Hollywood Relay`, daily at
+  05:45 local (Pacific), `Start-ScheduledTaskInfo`/`Get-ScheduledTaskInfo` to inspect.
+- Transcript log: `relay.log` in the repo root on the Windows desktop (gitignored, append
+  mode via `Start-Transcript`).
+- Scratch DB: `relay.db` in the repo root on the Windows desktop (gitignored) — only used
+  to read the `hollywood-theatre` row's `adapter_config`; never touches the real dataset.
+
+**Run manually:**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File deploy\relay-hollywood.ps1
+```
+
+**Known issues:**
+- **If the Windows box is off (or asleep) at the scheduled time, Hollywood silently gets
+  no run that day.** There is no VPS-side fallback fetch attempt and no alert fires for a
+  missed day — this is silence, not an error. Check `relay.log` and the VPS `scrape_run`
+  table for `hollywood-theatre` if showtimes look stale.
+- Retire this relay (delete the scheduled task, `deploy/relay-hollywood.ps1`, and the
+  `--exclude hollywood-theatre` on the VPS cron) once the planned home microserver is
+  running and can fetch Hollywood directly from its own residential IP.
+
+## Known issues (historical)
+
 - ~~The GitHub-issue alert channel gets HTTP 403 on issue creation~~ **Fixed** (commit
   `867f377`): `_github_api` sent no `User-Agent` header, and GitHub's API rejects
   UA-less requests with a bare `HTTP Error 403` regardless of token scope — not a
@@ -177,11 +212,12 @@ Then reinstall the crontab (`crontab -u shutin deploy/crontab.example`) once sat
   and locked it in with a regression test (`tests/test_alerts.py::test_github_api_sends_user_agent`).
   Verified live from the VPS: an authenticated `GET` through the real
   `alerts._github_api` code path returned `200` with the issue list. The write path
-  (issue `POST`) gets exercised for real the next time a theater fails and
-  `notify_failure` runs — including the ongoing `hollywood-theatre` failure above, which
-  will file/update a real `[scraper-broken] hollywood-theatre` issue. The GitHub channel
-  is expected to work in production now; SMTP remains intentionally unconfigured (no
-  creds provided), so email stays a "channel disabled" no-op until that's supplied.
+  (issue `POST`) gets exercised for real whenever a theater fails and `notify_failure`
+  runs. The GitHub channel is expected to work in production now; SMTP remains
+  intentionally unconfigured (no creds provided), so email stays a "channel disabled"
+  no-op until that's supplied.
+- ~~Hollywood Theatre returns a Cloudflare JS-challenge (403) from the VPS's IP~~
+  **Mitigated** (Task 11b): see "Hollywood relay (interim)" above.
 
 ## Deploying a new commit
 

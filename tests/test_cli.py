@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 
 import pytest
@@ -89,3 +90,36 @@ def test_recovery_closes_the_loop(env):
     FakeAdapter.fail = False
     assert cli.main(["refresh"]) == 0
     assert alerts["recover"] == ["fake-t"]
+
+
+def test_refresh_payload_skips_fetch(env, tmp_path, monkeypatch):
+    dbfile, alerts = env
+    payload_file = tmp_path / "p.json"
+    payload_file.write_text('{"x": 1}', encoding="utf-8")
+
+    def boom(config):
+        raise AssertionError("fetch must not run in payload mode")
+
+    monkeypatch.setattr(FakeAdapter, "fetch", boom)
+    assert cli.main(["refresh", "--theater", "fake-t", "--payload", str(payload_file)]) == 0
+    row = run_row(dbfile)
+    assert row["outcome"] == "ok" and row["screenings_found"] == 1
+
+
+def test_refresh_exclude(env):
+    dbfile, alerts = env
+    assert cli.main(["refresh", "--exclude", "fake-t"]) == 0
+    assert run_row(dbfile) is None  # the only theater was excluded -> no run rows
+
+
+def test_payload_requires_theater(env):
+    with pytest.raises(SystemExit) as e:
+        cli.main(["refresh", "--payload", "x.json"])
+    assert e.value.code == 2  # argparse usage error
+
+
+def test_fetch_payload_writes_file(env, tmp_path):
+    dbfile, alerts = env
+    out = tmp_path / "out.json"
+    assert cli.main(["fetch-payload", "--theater", "fake-t", "--out", str(out)]) == 0
+    assert json.loads(out.read_text(encoding="utf-8")) == {"x": 1}

@@ -12,13 +12,16 @@ def _conn():
     return db.connect(os.environ.get("SHUTIN_DB", "shutin.db"))
 
 
-def refresh(theater_id: str | None = None) -> int:
+def refresh(theater_id: str | None = None, payload_file: str | None = None,
+            exclude: str | None = None) -> int:
     conn = _conn()
     db.migrate(conn)
     cfg = alerts.config_from_env()
     q = "SELECT * FROM theater WHERE enabled=1"
     rows = conn.execute(q + " AND id=?", (theater_id,)).fetchall() if theater_id \
         else conn.execute(q).fetchall()
+    if exclude:
+        rows = [t for t in rows if t["id"] != exclude]
     exit_code = 0
     for t in rows:
         theater = dict(t)
@@ -30,7 +33,11 @@ def refresh(theater_id: str | None = None) -> int:
                 (theater["id"], run_id),
             ).fetchone()
             adapter = ADAPTERS[theater["adapter"]]
-            raw = adapter.parse(adapter.fetch(json.loads(theater["adapter_config"])))
+            if payload_file:
+                payload = json.loads(pathlib.Path(payload_file).read_text(encoding="utf-8"))
+            else:
+                payload = adapter.fetch(json.loads(theater["adapter_config"]))
+            raw = adapter.parse(payload)
             counts = store.record_screenings(conn, theater["id"], run_id, theater["timezone"], raw)
             suspicious = counts["found"] == 0 and store.was_previously_healthy(conn, theater["id"])
             outcome = "zero_screenings" if suspicious else "ok"
@@ -60,6 +67,21 @@ def _alert(conn, theater, run_id, cfg):
         store.mark_alerted(conn, run_id)
 
 
+def fetch_payload(theater_id: str, out: str) -> int:
+    """Adapter fetch only — for relaying a payload from a network that can reach the site."""
+    conn = _conn()
+    db.migrate(conn)
+    t = conn.execute("SELECT * FROM theater WHERE id=?", (theater_id,)).fetchone()
+    if t is None:
+        print(f"unknown theater: {theater_id}")
+        return 1
+    adapter = ADAPTERS[t["adapter"]]
+    payload = adapter.fetch(json.loads(t["adapter_config"]))
+    pathlib.Path(out).write_text(json.dumps(payload, default=str), encoding="utf-8")
+    print(f"wrote {out}")
+    return 0
+
+
 def record_fixtures(theater_id: str) -> int:
     conn = _conn()
     t = conn.execute("SELECT * FROM theater WHERE id=?", (theater_id,)).fetchone()
@@ -78,6 +100,11 @@ def main(argv=None) -> int:
     sub.add_parser("migrate")
     r = sub.add_parser("refresh")
     r.add_argument("--theater")
+    r.add_argument("--payload", help="pre-fetched payload JSON file; requires --theater")
+    r.add_argument("--exclude", help="theater id to skip")
+    fp = sub.add_parser("fetch-payload")
+    fp.add_argument("--theater", required=True)
+    fp.add_argument("--out", required=True)
     f = sub.add_parser("record-fixtures")
     f.add_argument("--theater", required=True)
     args = p.parse_args(argv)
@@ -85,7 +112,11 @@ def main(argv=None) -> int:
         print(db.migrate(_conn()) or "up to date")
         return 0
     if args.cmd == "refresh":
-        return refresh(args.theater)
+        if args.payload and not args.theater:
+            p.error("--payload requires --theater")
+        return refresh(args.theater, args.payload, args.exclude)
+    if args.cmd == "fetch-payload":
+        return fetch_payload(args.theater, args.out)
     return record_fixtures(args.theater)
 
 

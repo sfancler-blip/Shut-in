@@ -3,8 +3,8 @@
 # Box is UTC. 13:00 UTC ~= early morning Pacific (covers both DST phases well enough
 # for a daily refresh; 05:30 PT would be 12:30/13:30 UTC depending on DST).
 
-# daily refresh, 13:00 UTC ~= early morning Pacific
-0 13 * * *  cd /home/shutin/shut-in && set -a && . ./shutin.env && set +a && .venv/bin/shutin refresh >> refresh.log 2>&1
+# daily refresh (all theaters except hollywood - relayed from residential IP), 13:00 UTC
+0 13 * * *  cd /home/shutin/shut-in && set -a && . ./shutin.env && set +a && .venv/bin/shutin refresh --exclude hollywood-theatre >> refresh.log 2>&1
 
 # nightly sqlite backup (WAL-safe), 11:30 UTC, 7-day rotation by day-of-week
 30 11 * * * sqlite3 /home/shutin/shutin.db ".backup /home/shutin/backups/shutin-$(date +\%u).db" >> /home/shutin/shut-in/backup.log 2>&1
