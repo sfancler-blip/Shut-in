@@ -36,6 +36,7 @@ def _github_api(method: str, url: str, cfg: dict, body: dict | None = None):
         headers={
             "Authorization": f"Bearer {cfg['github_token']}",
             "Accept": "application/vnd.github+json",
+            "User-Agent": "shutin-alerts",
         },
         json=body,
         timeout=30,
