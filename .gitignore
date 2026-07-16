@@ -5,3 +5,6 @@ __pycache__/
 *.db-wal
 *.db-shm
 prototypes/
+shutin.env
+refresh.log
+backups/
