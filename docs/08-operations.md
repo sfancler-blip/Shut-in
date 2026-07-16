@@ -157,6 +157,24 @@ sqlite3 /home/shutin/shutin.db ".restore /home/shutin/backups/shutin-<n>.db"
 
 Then reinstall the crontab (`crontab -u shutin deploy/crontab.example`) once satisfied.
 
+## Known issues (as of first live VPS run)
+
+- **Hollywood Theatre returns a Cloudflare JS-challenge (403) from this VPS's IP.**
+  `cinemagic` scrapes clean; `hollywood-theatre` currently errors every run because
+  Cloudflare challenges the Hetzner datacenter IP regardless of the `curl_cffi`
+  TLS-impersonation that defeats it from residential/dev-machine IPs. This is a
+  scraper/adapter concern (see `.claude/skills/debug-theater-scraper`), not a
+  deployment-configuration problem — the cron/env/backup plumbing in this doc all
+  works correctly around it (the failure is recorded as an `error` `scrape_run` row,
+  `refresh.log` captures it, and the pipeline still completes the other theater and
+  exits non-zero as designed).
+- **The GitHub-issue alert channel currently gets HTTP 403 on issue creation** even
+  though the token has `repo` scope and a plain `GET` of the issues list with the same
+  token succeeds. Likely a permission restriction on the specific OAuth-app token in
+  use for the `POST`; needs a token audit before the auto-filed-issue alert channel can
+  be relied on. Until fixed, failures are visible via `scrape_run` rows and
+  `refresh.log` only (email channel is intentionally unset per the current setup).
+
 ## Deploying a new commit
 
 ```bash
