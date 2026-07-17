@@ -219,50 +219,52 @@ powershell -NoProfile -ExecutionPolicy Bypass -File deploy\relay-hollywood.ps1
 - ~~Hollywood Theatre returns a Cloudflare JS-challenge (403) from the VPS's IP~~
   **Mitigated** (Task 11b): see "Hollywood relay (interim)" above.
 
-## Alert drill 2026-07-16: pass with concerns
+## Alert drill 2026-07-16: pass
 
 Live end-to-end failure -> alert -> dedupe -> recovery drill against the VPS and the
 Windows relay (Task 12). Induced failure was `shutin refresh --theater hollywood-theatre`
 (plain fetch, no `--payload`) — this genuinely 403s at Cloudflare from the VPS's
 datacenter IP, so no config mutation was needed and restore was a no-op.
 
-**Step 1 (induced failure):** ran repeatedly (6 attempts across the drill). Every run
-correctly logged `scrape_run.outcome = error` for `hollywood-theatre` and printed
-`alerts: email channel disabled (SMTP_*/ALERT_EMAIL unset)` — expected, SMTP is
-intentionally unconfigured. The GitHub channel, however, hit `alerts: github channel
-failed: HTTP Error 503` on every single attempt, including after two independent
-"resolved now" signals (a controller-run probe POST that created and closed issue #1,
-and githubstatus.com briefly not listing an incident). A live check against
-`https://www.githubstatus.com/api/v2/incidents/unresolved.json` throughout the drill
-window showed an active, unresolved "Degraded REST API Availability" incident (impact
-`major`, status `investigating`, started `2026-07-16T22:51:13Z`) — direct calls to
-`GET https://api.github.com/repos/<repo>/issues` and even `GET /user` with the same
-token returned `503` with GitHub's generic "Unicorn" HTML error page, both from the VPS
-and from a local machine. **No drill-induced issue was ever created** — `gh issue list -R
-sfancler-blip/Shut-in --label scraper-broken --state all` shows only the closed
-controller-probe issue (`[drill-probe] delete me`, #1), not
-`[scraper-broken] hollywood-theatre`.
+**Interim note:** the first attempt at this drill hit a live, externally-confirmed
+GitHub REST API outage (`githubstatus.com` "Degraded REST API Availability", impact
+`major`, started `2026-07-16T22:51:13Z`) that 503'd every GitHub call for about 45
+minutes — `alerts.py` degraded correctly during that window (printed
+`alerts: github channel failed: HTTP Error 503`, did not crash the run). Once GitHub's
+"API Requests" component returned to `operational`, the drill was re-run start to finish
+and passed clean, below.
 
-**Step 2 (dedupe):** blocked — cannot verify comment-vs-new-issue behavior without a
-first issue existing. `scrape_run` rows 9, 11, 12, 13 (all `outcome=error`,
-`alerted=1`) confirm the app retried the alert on every run rather than silently
-skipping it, which is the correct crash-safe behavior even though the channel itself
-was down.
+**Step 1 (induced failure → issue opened):**
+```
+ssh root@5.78.194.128 "sudo -u shutin bash -c 'cd /home/shutin/shut-in && set -a && . ./shutin.env && set +a && .venv/bin/shutin refresh --theater hollywood-theatre'"
+```
+Output: `alerts: email channel disabled (SMTP_*/ALERT_EMAIL unset)` (expected — SMTP
+unconfigured), `hollywood-theatre: ERROR`, exit 1. `scrape_run` row 16:
+`outcome=error, alerted=1`. GitHub issue **#2** `[scraper-broken] hollywood-theatre`
+opened at `2026-07-17T00:02:43Z` with the run-16 traceback (Cloudflare `403`), the
+`shutin record-fixtures` repair command, and the `.claude/skills/debug-theater-scraper`
+link in the body, per `notify_failure`'s template.
 
-**Step 3 (recovery via relay):** the relay mechanics are verified green independent of
-GitHub. `Start-ScheduledTask "ShutIn Hollywood Relay"` ran twice during the drill
-(`relay.log`, `LastTaskResult 0` both times); each run fetched the payload locally, scp'd
-it to the VPS, and ingested it — `scrape_run` rows 10 and 14 show
-`outcome=ok, screenings_found=262` for `hollywood-theatre` via `--payload`. The
-issue-auto-close leg (`notify_recovery`) is blocked by the same GitHub 503 seen in Step 1
-(`relay.log`: `alerts: github channel failed: HTTP Error 503`) — and there was no open
-issue to close in the first place, since Step 1 never got one created.
+**Step 2 (dedupe):** repeated the same command. `scrape_run` row 17:
+`outcome=error, alerted=1`. **No second issue created** — `gh issue list` still shows
+only issue #2 open (plus the unrelated closed probe #1) — and a single new comment
+landed on #2 at `2026-07-17T00:02:57Z` referencing "Run 17", confirming the dedupe path
+(comment-on-existing) rather than a duplicate issue.
 
-**Conclusion:** the failure -> alert(best-effort, non-crashing) -> recovery(ingest) path
-is proven end-to-end; the GitHub issue lifecycle (create/dedupe/auto-close) could not be
-exercised in this drill window due to a genuine, externally-confirmed GitHub REST API
-outage. Re-run Steps 1-3 once `githubstatus.com` shows the "Degraded REST API
-Availability" incident resolved to confirm the issue-lifecycle leg.
+**Step 3 (recovery via relay):** `Start-ScheduledTask "ShutIn Hollywood Relay"`,
+foreground-polled `Get-ScheduledTaskInfo` from `Running` to `Ready`
+(`LastTaskResult 0`, run at `7/16/2026 5:03:18 PM` local). `relay.log`: payload fetched
+locally, scp'd, ingested via `--payload` — `hollywood-theatre: ok {'found': 262, 'new':
+0, 'updated': 262, 'cancelled': 0}`, no GitHub error line this time. `scrape_run` row 18:
+`outcome=ok, screenings_found=262, alerted=0`. Issue #2 got a recovery comment
+("Hollywood Theatre recovered — latest run green. Auto-closing.") at
+`2026-07-17T00:05:18Z` and was auto-closed one second later at `2026-07-17T00:05:19Z`.
+
+**Conclusion:** full failure -> alert -> dedupe -> recovery loop verified end to end on
+both the induced-failure and relay-recovery legs, and on both alert channels (GitHub
+issue lifecycle live; email correctly reporting itself disabled). See
+[task-12-report.md](../.superpowers/sdd/task-12-report.md) for the complete command-by-
+command log including the earlier GitHub-outage attempt.
 
 ## Deploying a new commit
 
