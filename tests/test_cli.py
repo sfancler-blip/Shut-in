@@ -123,3 +123,51 @@ def test_fetch_payload_writes_file(env, tmp_path):
     out = tmp_path / "out.json"
     assert cli.main(["fetch-payload", "--theater", "fake-t", "--out", str(out)]) == 0
     assert json.loads(out.read_text(encoding="utf-8")) == {"x": 1}
+
+
+def test_cleanup_failure_does_not_abort_remaining_theaters(env, monkeypatch):
+    """A secondary failure in the except-branch cleanup (finish_run/_alert, e.g. a
+    sqlite busy error) must not escape the per-theater loop and abort the theaters
+    that haven't run yet."""
+    dbfile, alerts = env
+    import sqlite3
+
+    class OkAdapter:
+        screenings = [RawScreening(
+            film_title="Predator",
+            starts_at_local=(datetime.now() + timedelta(days=7)).replace(
+                hour=20, minute=0, second=0, microsecond=0),
+        )]
+
+        @classmethod
+        def fetch(cls, config):
+            return {"x": 1}
+
+        @classmethod
+        def parse(cls, payload):
+            return cls.screenings
+
+    monkeypatch.setitem(ADAPTERS, "fake2", OkAdapter)
+    conn = db.connect(dbfile)
+    conn.execute(
+        "INSERT INTO theater (id, region_id, name, website_url, timezone, adapter,"
+        " adapter_config, tmdb_enrichment) VALUES"
+        " ('fake-t2', 'portland-or', 'Fake2', 'http://x', 'America/Los_Angeles', 'fake2', '{}', 0)"
+    )
+    conn.commit()
+    conn.close()
+
+    FakeAdapter.fail = True  # fake-t errors -> hits the except branch
+
+    def boom_alert(conn, theater, run_id, cfg):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(cli, "_alert", boom_alert)  # cleanup itself now fails
+
+    assert cli.main(["refresh"]) == 1  # still reports failure, doesn't crash
+
+    conn = db.connect(dbfile)
+    row2 = conn.execute(
+        "SELECT * FROM scrape_run WHERE theater_id='fake-t2' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert row2 is not None and row2["outcome"] == "ok"

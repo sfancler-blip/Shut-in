@@ -52,8 +52,13 @@ def refresh(theater_id: str | None = None, payload_file: str | None = None,
             print(f"{theater['id']}: {outcome} {counts}")
         except Exception:
             if run_id is not None:
-                store.finish_run(conn, run_id, "error", {}, traceback.format_exc()[-2000:])
-                _alert(conn, theater, run_id, cfg)
+                try:
+                    store.finish_run(conn, run_id, "error", {}, traceback.format_exc()[-2000:])
+                    _alert(conn, theater, run_id, cfg)
+                except Exception as e:
+                    print(f"{theater['id']}: ERROR (cleanup also failed: {e})")
+                    exit_code = 1
+                    continue
             print(f"{theater['id']}: ERROR")
             exit_code = 1
     return exit_code

@@ -16,6 +16,11 @@ def test_migrate_applies_schema_and_is_idempotent():
     assert db.migrate(conn) == []
 
 
+def test_connect_sets_busy_timeout():
+    conn = db.connect(":memory:")
+    assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+
+
 def test_screening_natural_key_is_unique():
     conn = db.connect(":memory:")
     db.migrate(conn)
